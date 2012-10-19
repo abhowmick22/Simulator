@@ -17,6 +17,8 @@
 #include "CmpMCT.h"
 #include "CmpLLCVTS.h"
 
+#include "CmpNextLinePrefetcher.h"
+
 
 // -----------------------------------------------------------------------------
 // Function to create a new component
@@ -31,19 +33,21 @@ MemoryComponent *CreateComponent(string type) {
   COMPONENT_LIST_BEGIN
 
   COMPONENT("trace", CmpTrace)
-  COMPONENT("mshr", CmpMSHR)
-  COMPONENT("cache", CmpCache)
-  COMPONENT("stall", CmpStall)
-  COMPONENT("simple-mc", CmpMemoryController)
-  COMPONENT("ucp", CmpUCP)
-  COMPONENT("dynamic-llc", CmpDynamicLLC)
-  COMPONENT("baseline-llc", CmpLLC)
-  COMPONENT("arc", CmpARC)
-  COMPONENT("su-llc", CmpSULLC)
-  COMPONENT("rtb-cache", CmpRTBCache)
-  COMPONENT("ship-ip", CmpSHIPIP)
-  COMPONENT("mct", CmpMCT)
-  COMPONENT("llc-vts", CmpLLCVTS)
+    
+    COMPONENT("mshr", CmpMSHR)
+    COMPONENT("cache", CmpCache)
+    COMPONENT("stall", CmpStall)
+    COMPONENT("simple-mc", CmpMemoryController)
+    COMPONENT("ucp", CmpUCP)
+    COMPONENT("dynamic-llc", CmpDynamicLLC)
+    COMPONENT("baseline-llc", CmpLLC)
+    COMPONENT("arc", CmpARC)
+    COMPONENT("su-llc", CmpSULLC)
+    COMPONENT("rtb-cache", CmpRTBCache)
+    COMPONENT("ship-ip", CmpSHIPIP)
+    COMPONENT("mct", CmpMCT)
+    COMPONENT("llc-vts", CmpLLCVTS)
+    COMPONENT("next-line-prefetcher", CmpNextLinePrefetcher)
 
   COMPONENT_LIST_END
 

@@ -155,4 +155,7 @@ struct MemoryRequest {
 #define PADDR(request) ((request) -> physicalAddress)
 #define VADDR(request) ((request) -> virtualAddress)
 
+#define VBLOCK_ADDRESS(request,size) (((VADDR(request)) / (size)) * (size))
+#define PBLOCK_ADDRESS(request,size) (((PADDR(request)) / (size)) * (size))
+
 #endif // __MEMORY_REQUEST_H__
