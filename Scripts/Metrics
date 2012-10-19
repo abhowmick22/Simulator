@@ -1,0 +1,4 @@
+# name|component:field|per-n-insts|title|y-label
+
+mpki|llc:misses|1000|Missed per 1000 Instructions|Normalized MPKI
+ipc|sim:cycles||Performance|Normalized IPC

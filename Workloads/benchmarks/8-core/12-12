@@ -1,0 +1,10 @@
+art-bzip2-lbm-leslie3d-omnetpp-soplex-swim-xalancbmk
+art-facerec-galgel-mcf-milc-omnetpp-soplex-swim
+art-astar-bwaves-facerec-leslie3d-mcf-parser-swim
+art-fma3d-leslie3d-mcf-milc-omnetpp-swim-xalancbmk
+ammp-applu-art-astar-leslie3d-mcf-milc-swim
+ammp-art-leslie3d-mcf-omnetpp-soplex-swim-zeusmp
+art-bwaves-facerec-leslie3d-mcf-omnetpp-soplex-xalancbmk
+art-astar-bzip2-leslie3d-parser-soplex-sphinx3-swim
+art-fma3d-lbm-mcf-omnetpp-sphinx3-swim-xalancbmk
+art-astar-libquantum-mcf-parser-soplex-swim-vpr
