@@ -173,6 +173,7 @@ if args.workload_file is not None:
 else:
     workloads = args.workload
 
+
 for workload in workloads:
 
     flag = False
@@ -207,8 +208,8 @@ for workload in workloads:
         # ----------------------------------------------------------------------
         # Create the run folder
         # ----------------------------------------------------------------------
-        
-        run_folder = results_folder + config[26:] + "/" + "-".join(benchmarks)
+
+        run_folder = results_folder + config[len(MOD_FOLDER + "Configs/"):] + "/" + "-".join(benchmarks)
         if not os.path.exists(run_folder):
             os.makedirs(run_folder)
 
