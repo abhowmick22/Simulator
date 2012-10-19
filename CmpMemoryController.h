@@ -197,7 +197,7 @@ class CmpMemoryController : public MemoryComponent {
       // determine if there is a switch penalty
       switch (request -> type) {
 
-        case MemoryRequest::READ: case MemoryRequest::PREFETCH:
+        case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH:
           INCREMENT(reads);
           if (_lastOp == MemoryRequest::WRITEBACK) {
             INCREMENT(writetoreads);
@@ -294,7 +294,7 @@ class CmpMemoryController : public MemoryComponent {
           else {
 
             switch (request -> type) {
-              case MemoryRequest::READ: case MemoryRequest::PREFETCH: 
+              case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH: 
                 _readQ.push_back(request);
                 break;
 

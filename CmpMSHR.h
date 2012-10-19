@@ -129,6 +129,7 @@ class CmpMSHR : public MemoryComponent {
       // that block's request list
       if (_missed.find(blockAddr) != _missed.end()) {
         if (request -> type == MemoryRequest::READ) {
+          _outstanding[blockAddr] -> type = MemoryRequest::READ;
           request -> stalling = true;
           _missed[blockAddr].push_back(request);
         }
@@ -156,6 +157,8 @@ class CmpMSHR : public MemoryComponent {
           request -> virtualAddress, blockAddr, _blockSize, 
           request -> currentCycle);
 
+      _outstanding[blockAddr] = miss;
+
       // convert a write into a partial write
       // if (miss -> type == MemoryRequest::WRITE)
       //  miss -> type = MemoryRequest::PARTIALWRITE;
@@ -168,6 +171,7 @@ class CmpMSHR : public MemoryComponent {
         _missed[blockAddr].push_back(request);
       }
       else {
+        _outstanding[blockAddr] -> type = MemoryRequest::READ_FOR_WRITE;
         request -> serviced = true;
       }
 
@@ -206,6 +210,7 @@ class CmpMSHR : public MemoryComponent {
 
       // remove the entry for the miss
       _missed.erase(blockAddr);
+      _outstanding.erase(blockAddr);
       if (!_waitQ.empty()) {
         MemoryRequest *front = _waitQ.front();
         _waitQ.pop_front();

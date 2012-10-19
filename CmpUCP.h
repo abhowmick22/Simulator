@@ -233,7 +233,7 @@ class CmpUCP : public MemoryComponent {
       switch (request -> type) {
 
         // READ request
-        case MemoryRequest::READ: case MemoryRequest::PREFETCH:
+        case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH:
 
           INCREMENT(reads);
 
