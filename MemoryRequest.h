@@ -36,7 +36,7 @@ struct MemoryRequest {
   // pointer to the initiator
   void *iniPtr; int32 cpuID;
   // request type
-  enum Type { READ, WRITE, PARTIALWRITE, WRITEBACK} type;
+  enum Type { READ, WRITE, PARTIALWRITE, WRITEBACK, PREFETCH} type;
   // instruction pointer
   addr_t ip;
   // virtual and physical addresses

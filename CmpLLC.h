@@ -185,7 +185,7 @@ class CmpLLC : public MemoryComponent {
       switch (request -> type) {
 
         // READ request
-        case MemoryRequest::READ:
+        case MemoryRequest::READ: case MemoryRequest::PREFETCH:
 
           INCREMENT(reads);
           
