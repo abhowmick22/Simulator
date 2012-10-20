@@ -13,7 +13,8 @@
 
 #include "MemoryComponent.h"
 #include "Types.h"
-#include <map>
+#include "GenericTable.h"
+
 
 // -----------------------------------------------------------------------------
 // Standard includes
@@ -39,7 +40,12 @@ protected:
   uint32 _degree;
   uint32 _blockSize;
   bool _prefetchOnWrite;
-  
+
+  uint32 _tableSize;
+  string _tablePolicy;
+  uint32 _numTrains;
+  uint32 _trainDistance;
+  uin32 _distance;
   
   // -------------------------------------------------------------------------
   // Private members
@@ -51,13 +57,32 @@ protected:
   // last stride
   // trained?
   
-  typedef struct blk_addr_t {
-    addr_t vaddr;
-    addr_t paddr;
-    
-  } blk_addr_t;
+  struct StrideEntry{
 
-  map<addr_t, blk_addr_t> stride_table;
+	//last recorded request address
+  addr_t vaddr;
+  addr_t paddr;
+
+	//last sent prefetch
+	addr_t vpref;
+	addr_t ppref;
+
+	//stride length
+	int stride;
+
+	//number of strides ahead
+	int stridesAhead;
+
+	//training state
+	int trainHits;
+	bool trained;
+    
+  };
+
+  generic_table_t<addr_t, StrideEntry> _strideTable;
+
+  addr_t _trainAddrDistance;
+  addr_t _prefetchAddrDistance;
 
   // -------------------------------------------------------------------------
   // Declare Counters
@@ -75,6 +100,13 @@ public:
     _degree = 4;
     _prefetchOnWrite = false;
     _blockSize = 64;
+		
+		_tableSize = 16;
+		_tablePolicy = "lru";
+
+		_numTrains = 2;
+		_distance = 24;
+		_trainDistance = 16;
   }
 
 
@@ -90,10 +122,16 @@ public:
       
     CMP_PARAMETER_BEGIN
 
-      // Add the list of parameters to the component here
-      CMP_PARAMETER_UINT("degree", _degree)
-      CMP_PARAMETER_UINT("block-size", _blockSize)
-      CMP_PARAMETER_BOOLEAN("prefetch-on-write", _prefetchOnWrite)
+    // Add the list of parameters to the component here
+    CMP_PARAMETER_UINT("degree", _degree)
+    CMP_PARAMETER_UINT("block-size", _blockSize)
+		CMP_PARAMETER_BOOLEAN("prefetch-on-write", _prefetchOnWrite)	  
+	  CMP_PARAMETER_UINT("table-size", _tableSize)
+	  CMP_PARAMETER_STRING("table_policy", _tablePolicy)
+	  CMP_PARAMETER_UINT("train-distance", _trainDistance)
+	  CMP_PARAMETER_UINT("num-trains", _numTrains)
+	  CMP_PARAMETER_UINT("distance", _distance)
+
 	  //TODO: add parameter for size of stride buffer
     CMP_PARAMETER_END
  }
@@ -112,6 +150,11 @@ public:
   // -------------------------------------------------------------------------
 
   void StartSimulation() {
+	  _strideTable.SetTableParameters(_tableSize, _tablePolicy);
+
+	  _trainAddrDistance = _trainDistance * _blockSize;
+	  _prefetchAddrDistance = _distance * _blockSize;
+
   }
 
 
@@ -146,66 +189,111 @@ protected:
       return 0;
     }
 
-    // Prefetch the next "degree" cachelines
-    // TODO: take care of across page prefetching!
-	addr_t vcla;
-	addr_t pcla;
-	addr_t v_delta;
-	addr_t p_delta;
+		addr_t vcla = VBLOCK_ADDRESS(request, __blockSize);
+	  addr_t pcla = PBLOCK_ADDRESS(request, __blockSize);
 
-	//if no IP entry found, add vlcla and pcla, return.
-	if(stride_table.count(request->ip) == 0)
-	{
-	  stride_table[request->ip].vaddr = VBLOCK_ADDRESS(request, _blockSize); 
-	  stride_table[request->ip].paddr = PBLOCK_ADDRESS(request, _blockSize);
-      //no information about the stream, therefore no prefetch
-	  return 0;
-	}
+		//if no IP entry found, add vcla and pcla, return.
+		if(stride_table.get(request->ip) == NULL)
+		{
+			StrideEntry newEntry;
+	  	newEntry.vaddr = VBLOCK_ADDRESS(request, _blockSize); 
+	  	newEntry.paddr = PBLOCK_ADDRESS(request, _blockSize);
+		  newEntry.trained = false;
+		  newEntry.trainHits = 0;
+			newEntry.stride = 0;
 
-	//If IP entry found, get the "stride" between current miss and last miss
-	//issue degree-many prefetches that are "stride" blocks away
-	else {
-	  //load addresses of current prefetch
-	  vcla = VBLOCK_ADDRESS(request, __blockSize);
-	  pcla = VBLOCK_ADDRESS(request, __blockSize);
+			//insert the new entry into the table
+		  _strideTable.insert(request->ip, newEntry);
+	
+	    //no information about the stream, therefore no prefetch
+		  return 0;
+		}
+		
+		//dummy read to update replacement state
+		_strideTable.read(request->ip);
 
-	  //delta in virtual and physical blocks 
-	  v_delta = vcla - stride_table[request->ip].vaddr;
-	  p_delta = pcla - stride_table[request->ip].paddr;
+		//actual read entry
+		StrideEntry &entry = _strideTable[request->ip];
+		
+		//delta in virtual and physical blocks 
+		v_delta = vcla - entry.vaddr;
+		p_delta = pcla - entry.paddr;
+		
+		//if IP entry found, but not trained OR stride not accurate
+		if(entry.trained == false || v_delta != entry.stride )  {
+	
+			//if current stride is the same as the last stride, 
+			//increment the trainhits
+			if(v_delta == entry.stride) {
+				entry.trainHits++;
+				entry.trained == false;
+			}
+	
+			//if the stride is different from the last stride, save current stride
+			//and reset the trainHits to 0;
+			else {
+				entry.stride = v_delta;
+				entry.trainHits = 0;
+				entry.trained == false;
+			}
 
-	  //if stride is 0, no point prefetching...
-	  //however, if stride is 0, that means the block is no longer in the 
-	  //L1 cache. maybe just make a mem request for the block?
-	  //(both delta values are the same because cache block size is the same)
-	  //TODO: think about this case more carefully. maybe if a block gets
-	  //evicted from L1 we should remove it from the hashtable?
-	  if(v_delta == 0 || p_delta == 0) {
-		 MemoryRequest *prefetch =
-          new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
-				  MemoryRequest::PREFETCH, request -> cmpID, 
-				  vcla, pcla, _blockSize, request -> currentCycle);
-        prefetch -> icount = request -> icount;
-        prefetch -> ip = request -> ip;
-        SendToNextComponent(prefetch);
-		return 0;
-	  }
+			//update the "last seen" pointer
+			entry.vaddr = vcla;
+			entry.paddr = pcla;
 
-	  //if stride is > 0, issue prefetches for the next degree-many
-	  //cache blocks, each a stride distance apart
-   	  for (int i = 0; i < _degree; i ++) {
-        vcla += _blockSize * v_delta;
-        pcla += _blockSize * p_delta;
+			//update the "last pref" pointer - no prefs yet, but keep current
+			entry.vpref = vcla;
+			entry.ppref = pcla;
+
+			//if pattern seen numTrains many times, time to set the trained bit
+			if(entry.trainHits >= _numTrains) {
+				entry.trained = true;
+			}
+		}
+	
+	
+		//If IP entry found, is trained, AND current stride is consistent:
+		//issue degree-many prefetches that are "stride" blocks away
+		if(entry.trained == true) {
+		  
+			//if stride is 0, no point prefetching...
+		  //TODO: think about this case more carefully. maybe if a block gets
+		  //evicted from L1 we should remove it from the hashtable?
+		  if(v_delta == 0 || p_delta == 0) {
+				return 0;
+		 	}
+
+			//update the "last seen" pointer
+			entry.vaddr = vcla;
+			entry.paddr = pcla;
+	
+		  //figure out how many prefetches to send
+			addr_t maxAddress = entry.vaddr + (_prefetchAddrDistance + _blockSize);
+			int maxPrefetches = (maxAddress - entry.vpref)/_blockSize;
+			int numPrefetches = (maxPrefetches > _degree) ? _degree : maxPrefetches;
+
+			//if stride is > 0, issue prefetches for the next degree-many
+		  //cache blocks, each a stride distance apart, upto a max distance away
+   	  for (int i = 0; i < numPrefetches; i ++) {
+
+				//virtual and physical addresses of next prefetch
+        entry.vpref += _blockSize * v_delta;
+        entry.ppref += _blockSize * p_delta;
+
+				//a generated memory request
         MemoryRequest *prefetch =
           new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
 				  MemoryRequest::PREFETCH, request -> cmpID, 
-				  vcla, pcla, _blockSize, request -> currentCycle);
+				  entry.vpref, entry.ppref, _blockSize, request -> currentCycle);
         prefetch -> icount = request -> icount;
         prefetch -> ip = request -> ip;
+
+				//send the prefetch request downstream
         SendToNextComponent(prefetch);
       }
-	  
-	  return 0; 
-	}
+		
+		  return 0; 
+		}
   }
 
 
