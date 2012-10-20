@@ -45,10 +45,17 @@ protected:
   // Private members
   // -------------------------------------------------------------------------
 
+  // Stride table entry
+  
+  // last seen address
+  // last stride
+  // trained?
+  
   typedef struct blk_addr_t {
     addr_t vaddr;
-	addr_t paddr;
-  }blk_addr_t;
+    addr_t paddr;
+    
+  } blk_addr_t;
 
   map<addr_t, blk_addr_t> stride_table;
 
