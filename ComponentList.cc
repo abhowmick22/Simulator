@@ -8,8 +8,10 @@
 #include "CmpStall.h"
 #include "CmpMemoryController.h"
 #include "CmpUCP.h"
-#include "CmpDynamicLLC.h"
+
+// EAF work
 #include "CmpLLC.h"
+#include "CmpDynamicLLC.h"
 #include "CmpARC.h"
 #include "CmpSULLC.h"
 #include "CmpRTBCache.h"
@@ -17,7 +19,9 @@
 #include "CmpMCT.h"
 #include "CmpLLCVTS.h"
 
+// Prefetchers
 #include "CmpNextLinePrefetcher.h"
+#include "CmpStreamPrefetcher.h"
 
 
 // -----------------------------------------------------------------------------
@@ -47,7 +51,10 @@ MemoryComponent *CreateComponent(string type) {
     COMPONENT("ship-ip", CmpSHIPIP)
     COMPONENT("mct", CmpMCT)
     COMPONENT("llc-vts", CmpLLCVTS)
+    
+    // prefetcher
     COMPONENT("next-line-prefetcher", CmpNextLinePrefetcher)
+    COMPONENT("stream-prefetcher", CmpStreamPrefetcher)
 
   COMPONENT_LIST_END
 

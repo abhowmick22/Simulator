@@ -68,6 +68,10 @@ protected:
     addr_t sp;
     addr_t ep;
 
+    // start and end physical addresses
+    addr_t psp;
+    addr_t pep;
+
     // is the prefetcher trained
     int trainHits;
     bool trained;
@@ -84,13 +88,14 @@ protected:
   // Frequently used values
   addr_t _trainAddrDistance;
   addr_t _prefetchAddrDistance;
+
   
   // -------------------------------------------------------------------------
   // Declare Counters
   // -------------------------------------------------------------------------
 
-  // No counters for now. May need later.
-
+  NEW_COUNTER(num_prefetches);
+  
 public:
 
   // -------------------------------------------------------------------------
@@ -142,6 +147,7 @@ public:
   // -------------------------------------------------------------------------
 
   void InitializeStatistics() {
+    INITIALIZE_COUNTER(num_prefetches, "Number of prefetches issued")
   }
 
 
@@ -210,7 +216,7 @@ protected:
       StreamEntry entry = row.value;
 
       // if entry is in the training phase
-      if (!row.trained) {
+      if (!row.value.trained) {
         if (llabs(entry.allocMissAddress - vcla) < _trainAddrDistance) {
           // HIT! entry within training scope
           hit = true;
@@ -248,7 +254,10 @@ protected:
           case FORWARD:
             // same direction.
             entry.trainHits ++;
-            if (vcla > entry.ep) entry.ep = vcla;
+            if (vcla > entry.ep) {
+              entry.ep = vcla;
+              entry.pep = pcla;
+            }
             break;
           case BACKWARD:
           case NONE:
@@ -256,6 +265,7 @@ protected:
             entry.trainHits = 1;
             entry.direction = FORWARD;
             entry.ep = vcla;
+            entry.pep = pcla;
             break;
           }
         }
@@ -266,7 +276,10 @@ protected:
           case BACKWARD:
             // same direction.
             entry.trainHits ++;
-            if (vcla < entry.ep) entry.ep = vcla;
+            if (vcla < entry.ep) {
+              entry.ep = vcla;
+              entry.pep = pcla;
+            }
             break;
           case FORWARD:
           case NONE:
@@ -274,6 +287,7 @@ protected:
             entry.trainHits = 1;
             entry.direction = BACKWARD;
             entry.ep = vcla;
+            entry.pep = pcla;
             break;
           }
         }
@@ -286,6 +300,60 @@ protected:
       // entry trained
       if (entry.trained) {
         // Issue prefetches
+
+        int32 numPrefetches = 0;
+        
+        // determine number of prefetches to issue
+        int32 maxPrefetches = 0;
+        if (entry.direction == FORWARD) {
+          addr_t maxAddress = entry.sp + (_prefetchAddrDistance + _blockSize);
+          maxPrefetches = (maxAddress - entry.ep) / _blockSize;
+        }
+        else {
+          addr_t minAddress = entry.sp - (_prefetchAddrDistance + _blockSize);
+          maxPrefetches = (entry.ep - minAddress) / _blockSize;
+        }
+        numPrefetches = (maxPrefetches < _degree ? maxPrefetches : _degree);
+
+        for (int32 i = 0; i < numPrefetches; i ++) {
+          entry.ep += (entry.direction * _blockSize);
+          entry.pep += (entry.direction * _blockSize);
+          MemoryRequest *prefetch =
+            new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                              MemoryRequest::PREFETCH, request -> cmpID, 
+                              entry.ep, entry.pep, _blockSize,
+                              request -> currentCycle);
+          prefetch -> icount = request -> icount;
+          prefetch -> ip = request -> ip;
+          SendToNextComponent(prefetch);
+        }
+
+        ADD_TO_COUNTER(num_prefetches, numPrefetches);
+
+        if (entry.direction == FORWARD &&
+            (entry.ep - entry.sp) > _prefetchAddrDistance) {
+          entry.sp = entry.ep - _prefetchAddrDistance;
+        }
+        else if (entry.direction == BACKWARD &&
+                 (entry.sp - entry.ep) > _prefetchAddrDistance) {
+          entry.sp = entry.ep + _prefetchAddrDistance;
+        }
+      }
+
+      // Remove redundant stream entry
+      for (uint32 i = 0; i < _tableSize; i ++) {
+        row = _streamTable.entry_at_index(i);
+        if (!row.valid) continue;
+        if (row.key == key) continue;
+
+        if (((entry.direction == FORWARD) &&
+             ((row.value.sp <= entry.ep && row.value.sp >= entry.sp) ||
+              (row.value.ep <= entry.ep && row.value.ep >= entry.sp))) ||
+            ((entry.direction == BACKWARD) &&
+             ((row.value.sp <= entry.sp && row.value.sp >= entry.ep) ||
+              (row.value.ep <= entry.sp && row.value.ep >= entry.ep)))) {
+          _streamTable.invalidate(row.key);
+        }
       }
     }
     
@@ -297,23 +365,13 @@ protected:
       entry.ip = request -> ip;
       entry.sp = vcla;
       entry.ep = vcla;
+      entry.psp = pcla;
+      entry.pep = pcla;
       entry.trainHits = 0;
       entry.trained = false;
       entry.direction = NONE;
       _streamTable.insert(_runningIndex, entry);
       _runningIndex ++;
-    }
-
-    for (int i = 0; i < _degree; i ++) {
-      vcla += _blockSize;
-      pcla += _blockSize;
-      MemoryRequest *prefetch =
-        new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
-                          MemoryRequest::PREFETCH, request -> cmpID, 
-                          vcla, pcla, _blockSize, request -> currentCycle);
-      prefetch -> icount = request -> icount;
-      prefetch -> ip = request -> ip;
-      SendToNextComponent(prefetch);
     }
     
     return 0; 
