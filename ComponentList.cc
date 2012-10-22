@@ -22,6 +22,7 @@
 // Prefetchers
 #include "CmpNextLinePrefetcher.h"
 #include "CmpStreamPrefetcher.h"
+#include "CmpStridePrefetcher.h"
 
 
 // -----------------------------------------------------------------------------
@@ -55,6 +56,7 @@ MemoryComponent *CreateComponent(string type) {
     // prefetcher
     COMPONENT("next-line-prefetcher", CmpNextLinePrefetcher)
     COMPONENT("stream-prefetcher", CmpStreamPrefetcher)
+    COMPONENT("stride-prefetcher", CmpStridePrefetcher)
 
   COMPONENT_LIST_END
 
