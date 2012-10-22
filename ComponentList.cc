@@ -19,6 +19,9 @@
 #include "CmpMCT.h"
 #include "CmpLLCVTS.h"
 
+// LLC with prefetch stats monitors
+#include "CmpLLCwPref.h"
+
 // Prefetchers
 #include "CmpNextLinePrefetcher.h"
 #include "CmpStreamPrefetcher.h"
@@ -52,6 +55,9 @@ MemoryComponent *CreateComponent(string type) {
     COMPONENT("ship-ip", CmpSHIPIP)
     COMPONENT("mct", CmpMCT)
     COMPONENT("llc-vts", CmpLLCVTS)
+
+    // LLC with prefetch monitors
+    COMPONENT("llc-pref", CmpLLCPref)
     
     // prefetcher
     COMPONENT("next-line-prefetcher", CmpNextLinePrefetcher)
