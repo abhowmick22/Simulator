@@ -104,6 +104,8 @@ protected:
   NEW_COUNTER(prefetch_use_cycle);
   NEW_COUNTER(prefetch_use_miss);
 
+  NEW_COUNTER(prefetch_lifetime_cycle);
+  NEW_COUNTER(prefetch_lifetime_miss);
 
 public:
 
@@ -159,6 +161,16 @@ public:
     INITIALIZE_COUNTER(misses, "Total Misses")
     INITIALIZE_COUNTER(evictions, "Evictions")
     INITIALIZE_COUNTER(dirty_evictions, "Dirty Evictions")
+
+    INITIALIZE_COUNTER(prefetches, "Total prefetches")
+    INITIALIZE_COUNTER(unused_prefetches, "Unused prefetches")
+    INITIALIZE_COUNTER(used_prefetches, "Used prefetches")
+    INITIALIZE_COUNTER(unreused_prefetches, "Unreused prefetches")
+    INITIALIZE_COUNTER(reused_prefetches, "Reused prefetches")
+
+    INITIALIZE_COUNTER(prefetch_use_cycle, "Prefetch-to-use Cycles")
+    INITIALIZE_COUNTER(prefetch_use_miss, "Prefetch-to-use Misses")
+
   }
 
 
@@ -343,12 +355,28 @@ protected:
       switch (tagentry.value.prefState) {
       case PREFETCHED_UNUSED:
         INCREMENT(unused_prefetches);
+        ADD_TO_COUNTER(prefetch_lifetime_cycle,
+                       request -> currentCycle - tagentry.value.prefetchCycle);
+        ADD_TO_COUNTER(prefetch_lifetime_miss,
+                       _missCounter[index] - tagentry.value.prefetchMiss);
         break;
+        
       case PREFETCHED_USED:
         INCREMENT(unreused_prefetches);
+        ADD_TO_COUNTER(prefetch_lifetime_cycle,
+                       request -> currentCycle - tagentry.value.prefetchCycle);
+        ADD_TO_COUNTER(prefetch_lifetime_miss,
+                       _missCounter[index] - tagentry.value.prefetchMiss);
         break;
-      case NOT_PREFETCHED:
+        
       case PREFETCHED_REUSED:
+        ADD_TO_COUNTER(prefetch_lifetime_cycle,
+                       tagentry.value.useCycle - tagentry.value.prefetchCycle);
+        ADD_TO_COUNTER(prefetch_lifetime_miss,
+                       tagentry.value.useMiss - tagentry.value.prefetchMiss);
+        break;
+        
+      case NOT_PREFETCHED:
         // do nothing
         break;
       }
