@@ -27,6 +27,9 @@
 #include "CmpStreamPrefetcher.h"
 #include "CmpStridePrefetcher.h"
 
+// DCP
+#include "CmpDCP.h"
+
 
 // -----------------------------------------------------------------------------
 // Function to create a new component
@@ -64,6 +67,9 @@ MemoryComponent *CreateComponent(string type) {
     COMPONENT("stream-prefetcher", CmpStreamPrefetcher)
     COMPONENT("stride-prefetcher", CmpStridePrefetcher)
 
+    // DCP
+    COMPONENT("dcp", CmpDCP)
+    
   COMPONENT_LIST_END
 
 }

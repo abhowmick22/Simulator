@@ -1,11 +1,12 @@
 // -----------------------------------------------------------------------------
-// File: CmpLLCwPref.h
+// File: CmpDCP.h
 // Description:
-//    Implements a last-level cache with prefetch monitors
+//    Implements a last-level cache with Decouple Caching and
+//    Prefetching and prefetch monitors
 // -----------------------------------------------------------------------------
 
-#ifndef __CMP_LLC_PREF_H__
-#define __CMP_LLC_PREF_H__
+#ifndef __CMP_DCP_H__
+#define __CMP_DCP_H__
 
 // -----------------------------------------------------------------------------
 // Module includes
@@ -21,12 +22,15 @@
 
 
 // -----------------------------------------------------------------------------
-// Class: CmpLLCPref
+// Class: CmpDCP
 // Description:
-//    Baseline lastlevel cache.
+//    Last-level cache with decoupled caching and prefetching.
+//
+// The changes to the baseline last-level cache are marked with a
+// comment DCP CHANGE.
 // -----------------------------------------------------------------------------
 
-class CmpLLCPref : public MemoryComponent {
+class CmpDCP : public MemoryComponent {
 
 protected:
 
@@ -38,7 +42,6 @@ protected:
   uint32 _blockSize;
   uint32 _associativity;
   string _policy;
-  uint32 _policyVal;
 
   uint32 _tagStoreLatency;
   uint32 _dataStoreLatency;
@@ -80,7 +83,6 @@ protected:
   // tag store
   uint32 _numSets;
   generic_tagstore_t <addr_t, TagEntry> _tags;
-  policy_value_t _pval;
 
   vector <uint32> _missCounter;
 
@@ -114,14 +116,13 @@ public:
   // Constructor. It cannot take any arguments
   // -------------------------------------------------------------------------
 
-  CmpLLCPref() {
+  CmpDCP() {
     _size = 1024;
     _blockSize = 64;
     _associativity = 16;
     _tagStoreLatency = 6;
     _dataStoreLatency = 15;
     _policy = "lru";
-    _policyVal = 0;
   }
 
 
@@ -142,7 +143,6 @@ public:
       CMP_PARAMETER_UINT("block-size", _blockSize)
       CMP_PARAMETER_UINT("associativity", _associativity)
       CMP_PARAMETER_STRING("policy", _policy)
-      CMP_PARAMETER_UINT("policy-value", _policyVal)
       CMP_PARAMETER_UINT("tag-store-latency", _tagStoreLatency)
       CMP_PARAMETER_UINT("data-store-latency", _dataStoreLatency)
 
@@ -188,12 +188,6 @@ public:
     _numSets = (_size * 1024) / (_blockSize * _associativity);
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _missCounter.resize(_numSets, 0);
-
-    switch (_policyVal) {
-    case 0: _pval = POLICY_HIGH; break;
-    case 1: _pval = POLICY_BIMODAL; break;
-    case 2: _pval = POLICY_LOW; break;
-    }
   }
 
 
@@ -245,8 +239,12 @@ protected:
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
 
+        // DCP CHANGE: Update state only for demand-fetched or
+        // already used blocks. For prefetched blocks, depromote
+        // to low priority. Code moved into switch case.
+        
         // read to update replacement policy
-        _tags.read(ctag);
+        // _tags.read(ctag);
         
         // read to update state
         TagEntry &tagentry = _tags[ctag];
@@ -259,6 +257,9 @@ protected:
           tagentry.useMiss = _missCounter[index];
           tagentry.useCycle = request -> currentCycle;
 
+          // DCP CHANGE: Depromote to low priority
+          _tags.read(ctag, POLICY_LOW);
+
           // update counters
           INCREMENT(used_prefetches);
           ADD_TO_COUNTER(prefetch_use_cycle,
@@ -268,12 +269,15 @@ protected:
           break;
           
         case PREFETCHED_USED:
+          _tags.read(ctag, POLICY_HIGH);
           tagentry.prefState = PREFETCHED_REUSED;
           INCREMENT(reused_prefetches);
+          
           break;
           
         case NOT_PREFETCHED:
         case PREFETCHED_REUSED:
+          _tags.read(ctag, POLICY_HIGH);
           // do nothing
           break;
         }
@@ -359,7 +363,7 @@ protected:
     table_t <addr_t, TagEntry>::entry tagentry;
 
     // insert the block into the cache
-    tagentry = _tags.insert(ctag, TagEntry(), _pval);
+    tagentry = _tags.insert(ctag, TagEntry(), POLICY_HIGH);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
     _tags[ctag].dirty = dirty;
@@ -425,4 +429,4 @@ protected:
   }
 };
 
-#endif // __CMP_LLC_PREF_H__
+#endif // __CMP_DCP_H__
