@@ -274,7 +274,7 @@ for workload in workloads:
                 # "luanga",
                 # "serengeti",
                 "vseshadr",
-                # "crocodile",
+                "crocodile",
                 "BOAR.ECE.CMU.EDU",
                 # "lsubrama",
                 # "rachata",

@@ -171,6 +171,9 @@ public:
     INITIALIZE_COUNTER(prefetch_use_cycle, "Prefetch-to-use Cycles")
     INITIALIZE_COUNTER(prefetch_use_miss, "Prefetch-to-use Misses")
 
+    INITIALIZE_COUNTER(prefetch_lifetime_cycle, "Prefetch-lifetime Cycles")
+    INITIALIZE_COUNTER(prefetch_lifetime_miss, "Prefetch-lifetime Misses")
+
   }
 
 
