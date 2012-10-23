@@ -80,6 +80,7 @@ protected:
   // tag store
   uint32 _numSets;
   generic_tagstore_t <addr_t, TagEntry> _tags;
+  policy_value_t _pval;
 
   vector <uint32> _missCounter;
 
@@ -187,6 +188,12 @@ public:
     _numSets = (_size * 1024) / (_blockSize * _associativity);
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _missCounter.resize(_numSets, 0);
+
+    switch (_policyVal) {
+    case 0: _pval = POLICY_HIGH; break;
+    case 1: _pval = POLICY_BIMODAL; break;
+    case 2: _pval = POLICY_LOW; break;
+    }
   }
 
 
@@ -352,7 +359,7 @@ protected:
     table_t <addr_t, TagEntry>::entry tagentry;
 
     // insert the block into the cache
-    tagentry = _tags.insert(ctag, TagEntry(), _policyVal);
+    tagentry = _tags.insert(ctag, TagEntry(), _pval);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
     _tags[ctag].dirty = dirty;

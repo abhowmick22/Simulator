@@ -34,253 +34,255 @@
 template <class key_t, class value_t>
 class set_dueling_tagstore_t {
 
-  protected:
+protected:
     
-    // -------------------------------------------------------------------------
-    // Parameters
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Parameters
+  // -------------------------------------------------------------------------
 
-    uint32 _numSets;
-    uint32 _numSlotsPerSet;
-    string _dynamicPolicy;
-    uint32 _numApps;
-    uint32 _numDuelingSets;
+  uint32 _numSets;
+  uint32 _numSlotsPerSet;
+  string _dynamicPolicy;
+  uint32 _numApps;
+  uint32 _numDuelingSets;
 
-    // -------------------------------------------------------------------------
-    // Private members
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Private members
+  // -------------------------------------------------------------------------
     
-    struct SetType {
-      bool leader;
-      uint32 appID;
-      uint32 policy;
-      SetType() { leader = false; }
-    };
+  struct SetType {
+    bool leader;
+    uint32 appID;
+    policy_value_t policy;
+    SetType() { leader = false; }
+  };
 
-    vector <SetType> _type;
-    vector <saturating_counter> _psel;
-    uint32 _threshold;
+  vector <SetType> _type;
+  vector <saturating_counter> _psel;
+  uint32 _threshold;
     
-    generic_table_t <key_t, value_t> *_sets;
+  generic_table_t <key_t, value_t> *_sets;
 
 
-  public:
+public:
 
-    // -------------------------------------------------------------------------
-    // Constructor
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Constructor
+  // -------------------------------------------------------------------------
 
-    set_dueling_tagstore_t() {
-      _numSets = 0;
-      _numApps = 0;
-      _numSlotsPerSet = 0;
-      _dynamicPolicy = "";
-      _numDuelingSets = 0;
+  set_dueling_tagstore_t() {
+    _numSets = 0;
+    _numApps = 0;
+    _numSlotsPerSet = 0;
+    _dynamicPolicy = "";
+    _numDuelingSets = 0;
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to set the tag store parameters
+  // -------------------------------------------------------------------------
+
+  void SetTagStoreParameters(uint32 numApps, uint32 numSets,
+                             uint32 numSlotsPerSet, string policy, uint32 numDuelingSets,
+                             uint32 maxPSELValue, uint32 _startVal = 512) {
+    _numApps = numApps;
+    _numSets = numSets;
+    _numSlotsPerSet = numSlotsPerSet;
+    _dynamicPolicy = policy;
+    _numDuelingSets = numDuelingSets;
+
+    // set the table parameters
+    _sets = new generic_table_t <key_t, value_t> [_numSets];
+    for (uint32 i = 0; i < _numSets; i ++)
+      _sets[i].SetTableParameters(_numSlotsPerSet, _dynamicPolicy);
+
+    // psel counters
+    _threshold = maxPSELValue / 2;
+    _psel.resize(_numApps, saturating_counter(maxPSELValue, _startVal));
+
+    // check if enough sets are available for dueling
+    if (2 * _numDuelingSets * _numApps > _numSets) {
+      fprintf(stderr, "Not enough dueling sets available!\n");
+      exit(0);
     }
 
 
-    // -------------------------------------------------------------------------
-    // Function to set the tag store parameters
-    // -------------------------------------------------------------------------
+    _type.resize(_numSets);
+    cyclic_pointer current(_numSets, 0);
 
-    void SetTagStoreParameters(uint32 numApps, uint32 numSets,
-        uint32 numSlotsPerSet, string policy, uint32 numDuelingSets,
-        uint32 maxPSELValue, uint32 _startVal = 512) {
-      _numApps = numApps;
-      _numSets = numSets;
-      _numSlotsPerSet = numSlotsPerSet;
-      _dynamicPolicy = policy;
-      _numDuelingSets = numDuelingSets;
-
-      // set the table parameters
-      _sets = new generic_table_t <key_t, value_t> [_numSets];
-      for (uint32 i = 0; i < _numSets; i ++)
-        _sets[i].SetTableParameters(_numSlotsPerSet, _dynamicPolicy);
-
-      // psel counters
-      _threshold = maxPSELValue / 2;
-      _psel.resize(_numApps, saturating_counter(maxPSELValue, _startVal));
-
-      // check if enough sets are available for dueling
-      if (2 * _numDuelingSets * _numApps > _numSets) {
-        fprintf(stderr, "Not enough dueling sets available!\n");
-        exit(0);
-      }
-
-
-      _type.resize(_numSets);
-      cyclic_pointer current(_numSets, 0);
-
-      // create the dueling sets for all the apps
-      for (uint32 id = 0; id < _numApps; id ++) {
-        for (uint32 sid = 0; sid < _numDuelingSets; sid ++) {
-          if (_type[current].leader) {
-            fprintf(stderr, "Something wrong in identifying dueling sets\n");
-            exit(0);
-          }
-          _type[current].leader = true;
-          _type[current].appID = id;
-          _type[current].policy = 0;
-          current.add(DUELING_PRIME);
-          if (_type[current].leader) {
-            fprintf(stderr, "Something wrong in identifying dueling sets\n");
-            exit(0);
-          }
-          _type[current].leader = true;
-          _type[current].appID = id;
-          _type[current].policy = 1;
-          current.add(DUELING_PRIME);
+    // create the dueling sets for all the apps
+    for (uint32 id = 0; id < _numApps; id ++) {
+      for (uint32 sid = 0; sid < _numDuelingSets; sid ++) {
+        if (_type[current].leader) {
+          fprintf(stderr, "Something wrong in identifying dueling sets\n");
+          exit(0);
         }
+        _type[current].leader = true;
+        _type[current].appID = id;
+        _type[current].policy = POLICY_HIGH;
+        current.add(DUELING_PRIME);
+        if (_type[current].leader) {
+          fprintf(stderr, "Something wrong in identifying dueling sets\n");
+          exit(0);
+        }
+        _type[current].leader = true;
+        _type[current].appID = id;
+        _type[current].policy = POLICY_BIMODAL;
+        current.add(DUELING_PRIME);
       }
     }
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to compute the index
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to compute the index
+  // -------------------------------------------------------------------------
 
-    uint32 index(key_t key) {
-      return key % _numSets;
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to return a count of number of entries in the tag store
-    // -------------------------------------------------------------------------
-
-    uint32 count() {
-      assert(_sets != NULL);
-      uint32 ret = 0;
-      for (uint32 i = 0; i < _numSets; i ++)
-        ret += _sets[i].count();
-      return ret;
-    }
+  uint32 index(key_t key) {
+    return key % _numSets;
+  }
 
 
-    // -------------------------------------------------------------------------
-    // return the policy for a particular application
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to return a count of number of entries in the tag store
+  // -------------------------------------------------------------------------
 
-    uint32 policy(uint32 appID) {
-      if (_psel[appID] > _threshold)
-        return 0;
-      else
-        return 1;
-    }
-
-    // -------------------------------------------------------------------------
-    // Function to look up if a key is present 
-    // -------------------------------------------------------------------------
-
-    bool lookup(key_t key) {
-      assert(_sets != NULL);
-      return _sets[index(key)].lookup(key);
-    }
+  uint32 count() {
+    assert(_sets != NULL);
+    uint32 ret = 0;
+    for (uint32 i = 0; i < _numSets; i ++)
+      ret += _sets[i].count();
+    return ret;
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to insert a key-value pair into the list
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // return the policy for a particular application
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry insert(uint32 appID, key_t key, value_t value, 
-        bool updatePSEL = true, uint32 pval0 = 0, uint32 pval1 = 1) {
-      uint32 setIndex = index(key);
-      if (updatePSEL && _type[setIndex].leader && 
-          _type[setIndex].appID == appID) {
-        if (_type[setIndex].policy == 0) {
-          _psel[appID].decrement();
-          return _sets[setIndex].insert(key, value, pval0);
-        }
-        else {
-          _psel[appID].increment();
-          return _sets[setIndex].insert(key, value, pval1);
-        }
-      }
+  uint32 policy(uint32 appID) {
+    if (_psel[appID] > _threshold)
+      return 0;
+    else
+      return 1;
+  }
 
-      assert(_sets != NULL);
-      if (_psel[appID] > _threshold)
+  // -------------------------------------------------------------------------
+  // Function to look up if a key is present 
+  // -------------------------------------------------------------------------
+
+  bool lookup(key_t key) {
+    assert(_sets != NULL);
+    return _sets[index(key)].lookup(key);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to insert a key-value pair into the list
+  // -------------------------------------------------------------------------
+
+  virtual TableEntry insert(uint32 appID, key_t key, value_t value, 
+                            bool updatePSEL = true, policy_value_t pval0 = POLICY_HIGH,
+                            policy_value_t pval1 = POLICY_BIMODAL) {
+    uint32 setIndex = index(key);
+    if (updatePSEL && _type[setIndex].leader && 
+        _type[setIndex].appID == appID) {
+      if (_type[setIndex].policy == POLICY_HIGH) {
+        _psel[appID].decrement();
         return _sets[setIndex].insert(key, value, pval0);
-      else 
+      }
+      else {
+        _psel[appID].increment();
         return _sets[setIndex].insert(key, value, pval1);
+      }
     }
 
+    assert(_sets != NULL);
+    if (_psel[appID] > _threshold)
+      return _sets[setIndex].insert(key, value, pval0);
+    else 
+      return _sets[setIndex].insert(key, value, pval1);
+  }
 
-    // -------------------------------------------------------------------------
-    // Function to read a key
-    // -------------------------------------------------------------------------
 
-    virtual TableEntry read(key_t key) {
-      assert(_sets != NULL);
-      return _sets[index(key)].read(key);
-    }
+  // -------------------------------------------------------------------------
+  // Function to read a key
+  // -------------------------------------------------------------------------
+
+  virtual TableEntry read(key_t key, policy_value_t pval = POLICY_HIGH) {
+    assert(_sets != NULL);
+    return _sets[index(key)].read(key, pval);
+  }
 
    
-    // -------------------------------------------------------------------------
-    // Function to update a key
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to update a key
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry update(key_t key, value_t value) {
-      assert(_sets != NULL);
-      return _sets[index(key)].update(key, value);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to silently update a key
-    // -------------------------------------------------------------------------
-
-    virtual TableEntry silentupdate(key_t key) {
-      assert(_sets != NULL);
-      return _sets[index(key)].silentupdate(key);
-    }
+  virtual TableEntry update(key_t key, value_t value,
+                            policy_value_t pval = POLICY_HIGH) {
+    assert(_sets != NULL);
+    return _sets[index(key)].update(key, value, pval);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to invalidate an entry
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to silently update a key
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry invalidate(key_t key) {
-      assert(_sets != NULL);
-      return _sets[index(key)].invalidate(key);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to get an entry by location
-    // -------------------------------------------------------------------------
-
-    TableEntry entry_at_location(uint32 setindex, uint32 slotindex) {
-      assert(_sets != NULL);
-      return _sets[setindex].entry_at_location(slotindex);
-    }
+  virtual TableEntry silentupdate(key_t key, policy_value_t pval = POLICY_HIGH) {
+    assert(_sets != NULL);
+    return _sets[index(key)].silentupdate(key, pval);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // operator [] . Provide simple access to value at some key
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to invalidate an entry
+  // -------------------------------------------------------------------------
 
-    value_t & operator[] (key_t key) {
-      assert(_sets != NULL);
-      return (_sets[index(key)])[key];
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Simple return the entry correponding to the tag
-    // -------------------------------------------------------------------------
-
-    TableEntry get(key_t key) {
-      return _sets[index(key)].get(key);
-    }
+  virtual TableEntry invalidate(key_t key) {
+    assert(_sets != NULL);
+    return _sets[index(key)].invalidate(key);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to force eviction from a set
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to get an entry by location
+  // -------------------------------------------------------------------------
 
-    TableEntry force_evict(uint32 index) {
-      return _sets[index].force_evict();
-    }
+  TableEntry entry_at_location(uint32 setindex, uint32 slotindex) {
+    assert(_sets != NULL);
+    return _sets[setindex].entry_at_location(slotindex);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // operator [] . Provide simple access to value at some key
+  // -------------------------------------------------------------------------
+
+  value_t & operator[] (key_t key) {
+    assert(_sets != NULL);
+    return (_sets[index(key)])[key];
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Simple return the entry correponding to the tag
+  // -------------------------------------------------------------------------
+
+  TableEntry get(key_t key) {
+    return _sets[index(key)].get(key);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to force eviction from a set
+  // -------------------------------------------------------------------------
+
+  TableEntry force_evict(uint32 index) {
+    return _sets[index].force_evict();
+  }
 };
 
 #endif // __SET_DUELING_TAG_STORE_H__

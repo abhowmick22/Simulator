@@ -30,167 +30,167 @@
 KVTemplate class generic_table_t {
 
 
-  protected:
+protected:
 
-    // -------------------------------------------------------------------------
-    // pointer to a table
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // pointer to a table
+  // -------------------------------------------------------------------------
 
-    TableClass *_table;
+  TableClass *_table;
 
-  public:
-
-
-    // -------------------------------------------------------------------------
-    // Constructor
-    // -------------------------------------------------------------------------
-
-    generic_table_t() {
-      _table = NULL;
-    }
+public:
 
 
-    // -------------------------------------------------------------------------
-    // Construct generic table with size and policy
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Constructor
+  // -------------------------------------------------------------------------
 
-    generic_table_t(uint32 size, string policy) {
-      _table = NULL;
-      SetTableParameters(size, policy);
-    }
-
-    // -------------------------------------------------------------------------
-    // Destructor
-    // -------------------------------------------------------------------------
-
-    ~generic_table_t() {
-      if (_table != NULL)
-        delete _table;
-    }
+  generic_table_t() {
+    _table = NULL;
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to set the table parameters
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Construct generic table with size and policy
+  // -------------------------------------------------------------------------
 
-    void SetTableParameters(uint32 size, string policy);
+  generic_table_t(uint32 size, string policy) {
+    _table = NULL;
+    SetTableParameters(size, policy);
+  }
 
+  // -------------------------------------------------------------------------
+  // Destructor
+  // -------------------------------------------------------------------------
 
-    // -------------------------------------------------------------------------
-    // Function to return a count of number of entries in the table
-    // -------------------------------------------------------------------------
-
-    uint32 count() {
-      assert(_table != NULL);
-      return _table -> count();
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to look up if a key is present 
-    // -------------------------------------------------------------------------
-
-    bool lookup(key_t key) {
-      assert(_table != NULL);
-      return _table -> lookup(key);
-    }
+  ~generic_table_t() {
+    if (_table != NULL)
+      delete _table;
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to insert a key-value pair into the list
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to set the table parameters
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry insert(key_t key, value_t value, 
-        policy_value_t pval = 0) {
-      assert(_table != NULL);
-      return _table -> insert(key, value, pval);
-    }
+  void SetTableParameters(uint32 size, string policy);
 
 
-    // -------------------------------------------------------------------------
-    // Function to read a key
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to return a count of number of entries in the table
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry read(key_t key, policy_value_t pval = 0) {
-      assert(_table != NULL);
-      return _table -> read(key, pval);
-    }
+  uint32 count() {
+    assert(_table != NULL);
+    return _table -> count();
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to look up if a key is present 
+  // -------------------------------------------------------------------------
+
+  bool lookup(key_t key) {
+    assert(_table != NULL);
+    return _table -> lookup(key);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to insert a key-value pair into the list
+  // -------------------------------------------------------------------------
+
+  virtual TableEntry insert(key_t key, value_t value, 
+                            policy_value_t pval = POLICY_HIGH) {
+    assert(_table != NULL);
+    return _table -> insert(key, value, pval);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to read a key
+  // -------------------------------------------------------------------------
+
+  virtual TableEntry read(key_t key, policy_value_t pval = POLICY_HIGH) {
+    assert(_table != NULL);
+    return _table -> read(key, pval);
+  }
 
    
-    // -------------------------------------------------------------------------
-    // Function to update a key
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to update a key
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry update(key_t key, value_t value, 
-        policy_value_t pval = 0) {
-      assert(_table != NULL);
-      return _table -> update(key, value, pval);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to silently update a key
-    // -------------------------------------------------------------------------
-
-    virtual TableEntry silentupdate(key_t key, policy_value_t pval = 0) {
-      assert(_table != NULL);
-      return _table -> silentupdate(key, pval);
-    }
+  virtual TableEntry update(key_t key, value_t value, 
+                            policy_value_t pval = POLICY_HIGH) {
+    assert(_table != NULL);
+    return _table -> update(key, value, pval);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to invalidate an entry
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to silently update a key
+  // -------------------------------------------------------------------------
 
-    virtual TableEntry invalidate(key_t key) {
-      assert(_table != NULL);
-      return _table -> invalidate(key);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Function to force eviction
-    // -------------------------------------------------------------------------
-
-    TableEntry force_evict() {
-      assert(_table != NULL);
-      return _table -> force_evict();
-    }
-
-    key_t to_be_evicted() {
-      assert(_table != NULL);
-      return _table -> to_be_evicted();
-    }
+  virtual TableEntry silentupdate(key_t key, policy_value_t pval = POLICY_HIGH) {
+    assert(_table != NULL);
+    return _table -> silentupdate(key, pval);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Function to get an entry by index
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to invalidate an entry
+  // -------------------------------------------------------------------------
 
-    TableEntry entry_at_index(uint32 index) {
-      assert(_table != NULL);
-      return _table -> entry_at_index(index);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // operator [] . Provide simple access to value at some key
-    // -------------------------------------------------------------------------
-
-    value_t & operator[] (key_t key) {
-      assert(_table != NULL);
-      return (*_table)[key];
-    }
+  virtual TableEntry invalidate(key_t key) {
+    assert(_table != NULL);
+    return _table -> invalidate(key);
+  }
 
 
-    // -------------------------------------------------------------------------
-    // Simply return the entry for a given key
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Function to force eviction
+  // -------------------------------------------------------------------------
 
-    TableEntry get(key_t key) {
-      assert(_table != NULL);
-      return _table -> get(key);
-    }
+  TableEntry force_evict() {
+    assert(_table != NULL);
+    return _table -> force_evict();
+  }
+
+  key_t to_be_evicted() {
+    assert(_table != NULL);
+    return _table -> to_be_evicted();
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Function to get an entry by index
+  // -------------------------------------------------------------------------
+
+  TableEntry entry_at_index(uint32 index) {
+    assert(_table != NULL);
+    return _table -> entry_at_index(index);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // operator [] . Provide simple access to value at some key
+  // -------------------------------------------------------------------------
+
+  value_t & operator[] (key_t key) {
+    assert(_table != NULL);
+    return (*_table)[key];
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Simply return the entry for a given key
+  // -------------------------------------------------------------------------
+
+  TableEntry get(key_t key) {
+    assert(_table != NULL);
+    return _table -> get(key);
+  }
 };
 
 
@@ -198,18 +198,18 @@ KVTemplate class generic_table_t {
 // Macros for including more policies
 // -----------------------------------------------------------------------------
 
-#define TABLE_POLICY_BEGIN \
+#define TABLE_POLICY_BEGIN                      \
   if (false) { }
 
-#define TABLE_POLICY_END \
-  else {\
-    fprintf(stderr, "Error: Unknown table policy `%s'\n", policy.c_str());\
-    exit(-1);\
+#define TABLE_POLICY_END                                                \
+  else {                                                                \
+    fprintf(stderr, "Error: Unknown table policy `%s'\n", policy.c_str()); \
+    exit(-1);                                                           \
   }
 
-#define TABLE_POLICY(name,type) \
-  else if (policy.compare(name) == 0) {\
-    _table = new type <key_t, value_t> (size);\
+#define TABLE_POLICY(name,type)                 \
+  else if (policy.compare(name) == 0) {         \
+    _table = new type <key_t, value_t> (size);  \
   }
 
 #include "PolicyList.h"
