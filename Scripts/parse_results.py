@@ -51,15 +51,29 @@ def parse_simulation_log(bench_folder):
 
     fin.close()
 
-#    data["llc"]["vts_hit_rate"] = data["llc"]["vts_hits"] * 100 / data["llc"]["misses"]
-#    data["llc"]["always_high_rate"] = data["llc"]["always_high"] * 100 / data["llc"]["misses"]
-
     # --------------------------------------------------------------------------
     # Open the ipc file
     # --------------------------------------------------------------------------
 
     data["sim"] = {"insts":{}, "cycles":{}, "ipc":{}}
     data["sim"]["throughput"] = 0
+
+    data["llc"]["prefetches"] = data["llc"]["used_prefetches"] + data["llc"]["unused_prefetches"] + 1
+    
+    data["llc"]["used_prefetch_frac"] = (data["llc"]["used_prefetches"] * 100) / data["llc"]["prefetches"]
+    data["llc"]["unused_prefetch_frac"] = (data["llc"]["unused_prefetches"] * 100) / data["llc"]["prefetches"]
+
+    data["llc"]["used_prefetches"] += 1
+    data["llc"]["reused_prefetch_frac"] = (data["llc"]["reused_prefetches"] * 100) / data["llc"]["used_prefetches"]
+    data["llc"]["unreused_prefetch_frac"] = (data["llc"]["unreused_prefetches"] * 100) / data["llc"]["used_prefetches"]
+
+    data["llc"]["prefetch_use_cycle"] = (data["llc"]["prefetch_use_cycle"]) /data["llc"]["used_prefetches"]
+    data["llc"]["prefetch_use_miss"] = (data["llc"]["prefetch_use_miss"]) /data["llc"]["used_prefetches"]
+    
+    
+    data["llc"]["prefetch_lifetime_cycle"] = (data["llc"]["prefetch_lifetime_cycle"]) /data["llc"]["prefetches"]
+    data["llc"]["prefetch_lifetime_miss"] = (data["llc"]["prefetch_lifetime_miss"]) /data["llc"]["prefetches"]
+
 
     fin = open(bench_folder + "/sim.ipc", "r")
 
@@ -91,10 +105,7 @@ def compute_speedup(sets, alone_run):
 
     for name, value in sets.iteritems():
         for workload, data in value.iteritems():
-            flag = False;
-            if workload == "art-crafty":
-                flag = True;
-            
+
             # ------------------------------------------------------------------
             # Initialize ws and hs
             # ------------------------------------------------------------------
@@ -141,7 +152,19 @@ def get_metric(name):
     elif name == "hs":
         return ("sim:hs", None)
     elif name == "ms":
-        return ("sim:ms", None)   
+        return ("sim:ms", None)
+    elif name == "prefetch_accuracy":
+        return ("llc:used_prefetch_frac", None)
+    elif name == "upp_rate":
+        return ("llc:unreused_prefetch_frac", None)
+    elif name == "pref_lifetime":
+        return ("llc:prefetch_lifetime_cycle", None)
+    elif name == "pref_lifetime_miss":
+        return ("llc:prefetch_lifetime_miss", None)
+    elif name == "pref_use_cycle":
+        return ("llc:prefetch_use_cycle", None)
+    elif name == "pref_use_miss":
+        return ("llc:prefetch_use_miss", None)
     
     print "Error: Undefined metric name"
     quit()
@@ -202,7 +225,7 @@ parser.add_argument("--only-mean", action = "store_true", default = False,
 parser.add_argument("--workload-name", action = "store", 
     help = "Name for the workload")
 parser.add_argument("--justify-width", action = "store", type = int, 
-    default = 40, help = "Justification for workload name")
+    default = 0, help = "Justification for workload name")
 parser.add_argument("--legend-x-shift", action = "store", type = int, 
     default = 0, help = "Legend x shift")
 parser.add_argument("--legend-y-shift", action = "store", type = int,
@@ -406,6 +429,7 @@ for name in set_order:
             zip(output, kv.values(name, key_order = print_order))]
 
 if args.print_table:
+    print ''.join([' %s' % (set_name) for set_name in set_order])
     for line in output:
         print line
 

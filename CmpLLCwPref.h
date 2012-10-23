@@ -216,7 +216,7 @@ protected:
     // NO WRITES (Complete or partial)
     if (request -> type == MemoryRequest::WRITE || 
         request -> type == MemoryRequest::PARTIALWRITE) {
-      fprintf(stderr, "LLC annot handle direct writes (yet)\n");
+      fprintf(stderr, "LLC cannot handle direct writes (yet)\n");
       exit(0);
     }
 
@@ -230,7 +230,6 @@ protected:
     // READ request
     case MemoryRequest::READ:
     case MemoryRequest::READ_FOR_WRITE:
-    case MemoryRequest::PREFETCH:
 
       INCREMENT(reads);
           
@@ -281,7 +280,26 @@ protected:
           
       return _tagStoreLatency;
 
+    case MemoryRequest::PREFETCH:
 
+      INCREMENT(reads);
+          
+      if (_tags.lookup(ctag)) {
+        request -> serviced = true;
+        request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
+
+        // read to update replacement policy
+        _tags.read(ctag);
+      }
+      else {
+        INCREMENT(misses);
+        request -> AddLatency(_tagStoreLatency);
+        _missCounter[index] ++;
+      }
+          
+      return _tagStoreLatency;
+
+      
     // WRITEBACK request
     case MemoryRequest::WRITEBACK:
 
@@ -348,6 +366,7 @@ protected:
       _tags[ctag].prefState = PREFETCHED_UNUSED;
       _tags[ctag].prefetchCycle = request -> currentCycle;
       _tags[ctag].prefetchMiss = _missCounter[index];
+      INCREMENT(prefetches);
     }
 
     // if the evicted tag entry is valid
