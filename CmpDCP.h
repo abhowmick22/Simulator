@@ -16,6 +16,8 @@
 #include "Types.h"
 #include "GenericTagStore.h"
 
+#include "VictimTagStore.h"
+
 // -----------------------------------------------------------------------------
 // Standard includes
 // -----------------------------------------------------------------------------
@@ -45,6 +47,11 @@ protected:
 
   uint32 _tagStoreLatency;
   uint32 _dataStoreLatency;
+
+  // DCP parameters
+  bool _prefetchRequestPromote;
+  bool _reusePrediction;
+  bool _demandReusePrediction;
 
   // -------------------------------------------------------------------------
   // Private members
@@ -83,6 +90,9 @@ protected:
   // tag store
   uint32 _numSets;
   generic_tagstore_t <addr_t, TagEntry> _tags;
+
+  // reuse predictor
+  evicted_address_filter_t _eaf;
 
   vector <uint32> _missCounter;
 
@@ -125,6 +135,9 @@ public:
     _tagStoreLatency = 6;
     _dataStoreLatency = 15;
     _policy = "lru";
+    _prefetchRequestPromote = true;
+    _reusePrediction = false;
+    _demandReusePrediction = false;
   }
 
 
@@ -192,6 +205,10 @@ public:
     _numSets = (_size * 1024) / (_blockSize * _associativity);
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _missCounter.resize(_numSets, 0);
+
+    // initialize the reuse predictor
+    if (_reusePrediction)
+      _eaf.initialize(_numSets * _associativity);
   }
 
 
@@ -262,7 +279,12 @@ protected:
           tagentry.useCycle = request -> currentCycle;
 
           // DCP CHANGE: Depromote to low priority
-          _tags.read(ctag, POLICY_LOW);
+          // DCP-RP CHANGE: Check if we need to use reuse predictor
+          if (_reusePrediction && _eaf.test(ctag))
+            _tags.read(ctag, POLICY_HIGH);
+          else
+            _tags.read(ctag, POLICY_LOW);
+
 
           // update counters
           INCREMENT(used_prefetches);
@@ -304,7 +326,10 @@ protected:
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
 
         // read to update replacement policy
-        _tags.read(ctag);
+        // if we shoule promote on a prefetch request hit?
+        // else do nothing
+        if (_prefetchRequestPromote)
+          _tags.read(ctag, POLICY_HIGH);
       }
       else {
         INCREMENT(prefetch_misses);
@@ -365,9 +390,15 @@ protected:
   void INSERT_BLOCK(addr_t ctag, bool dirty, MemoryRequest *request) {
 
     table_t <addr_t, TagEntry>::entry tagentry;
+    policy_value_t priority = POLICY_HIGH;
+
+    if (_demandReusePrediction &&
+        request -> type != MemoryRequest::PREFETCH &&
+        !_eaf.test(ctag)) 
+      priority = POLICY_BIMODAL;
 
     // insert the block into the cache
-    tagentry = _tags.insert(ctag, TagEntry(), POLICY_HIGH);
+    tagentry = _tags.insert(ctag, TagEntry(), priority);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
     _tags[ctag].dirty = dirty;
@@ -388,6 +419,10 @@ protected:
     if (tagentry.valid) {
       INCREMENT(evictions);
 
+      // insert into eaf it its not an unused prefetch
+      if (tagentry.value.prefState != PREFETCHED_UNUSED)
+        _eaf.insert(ctag);
+      
       // check prefetched state
       switch (tagentry.value.prefState) {
       case PREFETCHED_UNUSED:

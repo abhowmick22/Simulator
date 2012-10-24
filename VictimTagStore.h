@@ -81,7 +81,7 @@ class victim_tag_store_t {
     // Constructor with parameters
     // -------------------------------------------------------------------------
 
-  victim_tag_store_t(uint32 numBlocks, bool useBloomFilter, bool ideal,
+  victim_tag_store_t(uint32 numBlocks, bool useBloomFilter=false, bool ideal=false,
                      bool noClear = false, bool decoupleClear = false,
                      bool segmented = false, uint32 alpha = 8) {
     initialize(numBlocks, useBloomFilter, ideal, noClear, decoupleClear, segmented, alpha);
@@ -92,7 +92,7 @@ class victim_tag_store_t {
     // Initialize
     // -------------------------------------------------------------------------
 
-  void initialize(uint32 numBlocks, bool useBloomFilter, bool ideal,
+  void initialize(uint32 numBlocks, bool useBloomFilter=false, bool ideal=false,
                   bool noClear=false, bool decoupleClear = false,
                   bool segmented = false, uint32 alpha = 8) {
 
@@ -230,5 +230,7 @@ class victim_tag_store_t {
     }
     
 };
+
+typedef victim_tag_store_t evicted_address_filter_t;
 
 #endif // __VICTIM_TAG_STORE_H__
