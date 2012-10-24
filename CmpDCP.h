@@ -161,6 +161,10 @@ public:
       CMP_PARAMETER_UINT("tag-store-latency", _tagStoreLatency)
       CMP_PARAMETER_UINT("data-store-latency", _dataStoreLatency)
 
+      CMP_PARAMETER_BOOLEAN("prefetch-request-promote", _prefetchRequestPromote)
+      CMP_PARAMETER_BOOLEAN("reuse-prediction", _reusePrediction)
+      CMP_PARAMETER_BOOLEAN("demand-reuse-prediction", _demandReusePrediction)
+
     CMP_PARAMETER_END
   }
 
