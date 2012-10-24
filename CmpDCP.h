@@ -99,6 +99,8 @@ protected:
   NEW_COUNTER(dirty_evictions);
 
   NEW_COUNTER(prefetches);
+  NEW_COUNTER(prefetch_misses);
+  
   NEW_COUNTER(unused_prefetches);
   NEW_COUNTER(used_prefetches);
   NEW_COUNTER(unreused_prefetches);
@@ -164,6 +166,8 @@ public:
     INITIALIZE_COUNTER(dirty_evictions, "Dirty Evictions")
 
     INITIALIZE_COUNTER(prefetches, "Total prefetches")
+    INITIALIZE_COUNTER(prefetch_misses, "Prefetch misses")
+
     INITIALIZE_COUNTER(unused_prefetches, "Unused prefetches")
     INITIALIZE_COUNTER(used_prefetches, "Used prefetches")
     INITIALIZE_COUNTER(unreused_prefetches, "Unreused prefetches")
@@ -303,7 +307,7 @@ protected:
         _tags.read(ctag);
       }
       else {
-        INCREMENT(misses);
+        INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
         _missCounter[index] ++;
       }
