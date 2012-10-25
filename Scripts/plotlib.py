@@ -101,13 +101,13 @@ class PlotLib:
                              'blue',
                              ]
 
-        self._bar_styles = ['fill=black!0',
+        self._bar_styles = ['fill=black!60',
+                            'fill=black!100',
+                            'fill=black!0',
                             'pattern=north west lines',
                             'fill=black!40',
                             'pattern=north east lines',
-                            'fill=black!60',
                             'pattern=crosshatch',
-                            'fill=black!100',
                             'pattern=crosshatch dots',
                             'fill=black!20',
                             'pattern=horizontal lines',

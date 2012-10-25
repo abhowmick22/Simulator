@@ -263,10 +263,10 @@ for workload in workloads:
 
             compute_machines = [
                 # "meerkat",
-                # "catfish",
+                "catfish",
                 # "ocelot",
-                # "yeti",
-                # "arachnid",
+                "yeti",
+                "arachnid",
                 # "amoeba",
                 # "newt",
                 # "africanswallow",
@@ -276,12 +276,20 @@ for workload in workloads:
                 "vseshadr",
                 "crocodile",
                 "BOAR.ECE.CMU.EDU",
-                # "lsubrama",
+                "lsubrama",
                 # "rachata",
                 # "warthog",
                 # "giraffe",
                 # "baboon",
                 # "staircase4",
+                "cheetah01",
+                "cheetah03",
+                "cheetah04",
+                "cheetah05",
+                "cheetah06",
+                "cheetah07",
+                "cheetah08",
+                "cheetah09",
             ]
 
             if args.machine is None:

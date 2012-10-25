@@ -122,6 +122,8 @@ protected:
   NEW_COUNTER(prefetch_lifetime_cycle);
   NEW_COUNTER(prefetch_lifetime_miss);
 
+  NEW_COUNTER(eaf_hits);
+  
 public:
 
   // -------------------------------------------------------------------------
@@ -196,6 +198,7 @@ public:
     INITIALIZE_COUNTER(prefetch_lifetime_cycle, "Prefetch-lifetime Cycles")
     INITIALIZE_COUNTER(prefetch_lifetime_miss, "Prefetch-lifetime Misses")
 
+    INITIALIZE_COUNTER(eaf_hits, "EAF hits")
   }
 
 
@@ -284,10 +287,13 @@ protected:
 
           // DCP CHANGE: Depromote to low priority
           // DCP-RP CHANGE: Check if we need to use reuse predictor
-          if (_reusePrediction && _eaf.test(ctag))
+          if (_reusePrediction && _eaf.test(ctag)) {
             _tags.read(ctag, POLICY_HIGH);
-          else
+            INCREMENT(eaf_hits);
+          }
+          else {
             _tags.read(ctag, POLICY_LOW);
+          }
 
 
           // update counters
@@ -424,8 +430,10 @@ protected:
       INCREMENT(evictions);
 
       // insert into eaf it its not an unused prefetch
-      if (tagentry.value.prefState != PREFETCHED_UNUSED)
-        _eaf.insert(ctag);
+      if (_reusePrediction) {
+        if (tagentry.value.prefState != PREFETCHED_UNUSED)
+          _eaf.insert(tagentry.key);
+      }
       
       // check prefetched state
       switch (tagentry.value.prefState) {
