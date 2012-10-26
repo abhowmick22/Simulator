@@ -67,6 +67,7 @@ def parse_simulation_log(bench_folder):
         data["llc"]["predicted_accurate_frac"] = (data["llc"]["predicted_accurate"] * 100) / data["llc"]["prefetches"]
         data["llc"]["accurate_predicted_inaccurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["prefetches"]
         data["llc"]["inaccurate_predicted_accurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["prefetches"]
+        data["llc"]["incorrect_frac"] = ((data["llc"]["accurate_predicted_inaccurate"] + data["llc"]["inaccurate_predicted_accurate"]) * 100) / data["llc"]["prefetches"]
     
     data["llc"]["used_prefetches"] += 1
     data["llc"]["reused_prefetch_frac"] = (data["llc"]["reused_prefetches"] * 100) / data["llc"]["used_prefetches"]
@@ -172,8 +173,8 @@ def get_metric(name):
         return ("llc:prefetch_use_miss", None)
     elif name == "pref_pred_acc":
         return ("llc:predicted_accurate_frac", None)
-    elif name == "pref_incorrect_pred":
-        return ("llc:incorrect_predictions_frac", None)
+    elif name == "incorrect_pred":
+        return ("llc:incorrect_frac", None)
     
     print "Error: Undefined metric name"
     quit()
