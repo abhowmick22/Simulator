@@ -113,6 +113,15 @@ class PlotLib:
                             'pattern=horizontal lines',
                             'fill=black!80']
 
+        self._bar_styles2 = ['fill=black!30',
+                            'fill=black!100',
+                            ]
+
+        self._bar_styles3 = ['fill=black!0',
+                            'pattern=crosshatch',
+                            'fill=black!100',
+                            ]
+
 
     # --------------------------------------------------------------------------
     # Function to add title
@@ -208,9 +217,18 @@ class PlotLib:
             print "Not enough styles available"
             quit()
 
-        for index, style in enumerate(self._bar_styles):
-            name = "bar-style-" + str(index + 1)
-            self._tikz.style(name, style)
+        if len(sets) == 2:
+            for index, style in enumerate(self._bar_styles2):
+                name = "bar-style-" + str(index + 1)
+                self._tikz.style(name, style)
+        elif len(sets) == 3:
+            for index, style in enumerate(self._bar_styles3):
+                name = "bar-style-" + str(index + 1)
+                self._tikz.style(name, style)
+        else:
+            for index, style in enumerate(self._bar_styles):
+                name = "bar-style-" + str(index + 1)
+                self._tikz.style(name, style)
         
         styles = ["bar-style-" + str(i + 1) for i in range(len(sets))]
 
@@ -529,7 +547,7 @@ class PlotLib:
         for value, y in y_tics:
             self._tikz.line_shift((0,y), -self._y_tics_size, 0)
             self._tikz.line_shift((0,y), self._plot_width, 0, \
-                options = "[very thin]")
+                options = "[thin,densely dotted]")
             self._tikz.text((self._y_tics_shift,y), str(value), \
                 options = "[left]", fontsize = self._y_tics_fontsize)
             

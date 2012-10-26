@@ -54,6 +54,8 @@ struct MemoryRequest {
   uint64 icount;
   // issue cycle of the request
   cycles_t issueCycle;
+  // id of the prefetcher if prefetched
+  uint32 prefetcherID;
   
   // ---------------------------------------------------------------------------
   // Dynamically determined fields
@@ -77,6 +79,14 @@ struct MemoryRequest {
 
 
   // ---------------------------------------------------------------------------
+  // Prefetcher related fields (quick hack)
+  // ---------------------------------------------------------------------------
+
+  bool d_prefetched; // (possibly)
+  uint32 d_prefID;
+  bool d_hit;
+
+  // ---------------------------------------------------------------------------
   // Component specific fields
   // ---------------------------------------------------------------------------
 
@@ -87,8 +97,6 @@ struct MemoryRequest {
   // which they hit. Set to max sets if its a victim set miss
   bool reuseVictim;
   uint32 victimSetID;
-  // memcheck
-  bool data;
 
   // ---------------------------------------------------------------------------
   // Constructor
@@ -101,7 +109,8 @@ struct MemoryRequest {
     serviced = false;
     finished = false;
     dirtyReply = false;
-    data = true;
+    d_prefetched = false;
+    d_hit = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -125,7 +134,8 @@ struct MemoryRequest {
     serviced = false;
     finished = false;
     dirtyReply = false;
-    data = true;
+    d_prefetched = false;
+    d_hit = false;
   }
 
   // ---------------------------------------------------------------------------

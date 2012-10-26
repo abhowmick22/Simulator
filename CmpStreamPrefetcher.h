@@ -301,6 +301,10 @@ protected:
       if (entry.trained) {
         // Issue prefetches
 
+        // update the request entry
+        request -> d_prefetched = true;
+        request -> d_prefID = row.index;
+
         int32 numPrefetches = 0;
         
         // determine number of prefetches to issue
@@ -325,6 +329,7 @@ protected:
                               request -> currentCycle);
           prefetch -> icount = request -> icount;
           prefetch -> ip = request -> ip;
+          prefetch -> prefetcherID = row.index;
           SendToNextComponent(prefetch);
         }
 
