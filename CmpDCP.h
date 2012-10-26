@@ -22,6 +22,7 @@
 // Standard includes
 // -----------------------------------------------------------------------------
 
+#define SET_DUEL_PRIME 443
 
 // -----------------------------------------------------------------------------
 // Class: CmpDCP
@@ -100,7 +101,15 @@ protected:
   generic_tagstore_t <addr_t, TagEntry> _tags;
 
   // D-EAF reuse predictor
+  struct SetEntry {
+    bool leader;
+    bool eaf;
+    SetEntry() { leader = false; }
+  };
   evicted_address_filter_t _eaf;
+  vector <SetEntry> _duelInfo;
+  saturating_counter _psel;
+  uint32 _pselThreshold;
   
 
   // accuracy predictor
@@ -165,6 +174,7 @@ public:
     _accuracyTableSize = 16;
     _prefetchDistance = 24;
     _accuracyCounterMax = 16;
+    _pselThreshold = 1024;
   }
 
 
@@ -248,8 +258,21 @@ public:
     _missCounter.resize(_numSets, 0);
 
     // initialize the reuse predictor
-    if (_reusePrediction || _demandReusePrediction)
+    if (_reusePrediction || _demandReusePrediction) {
       _eaf.initialize(_numSets * _associativity);
+      _psel = saturating_counter(_pselThreshold, _pselThreshold / 2);
+      // dueling sets
+      _duelInfo.resize(_numSets);
+      cyclic_pointer current(_numSets, 0);
+      for (int i = 0; i < 32; i ++) {
+        _duelInfo[current].leader = true;
+        _duelInfo[current].eaf = true;
+        current.add(SET_DUEL_PRIME);
+        _duelInfo[current].leader = true;
+        _duelInfo[current].eaf = false;
+        current.add(SET_DUEL_PRIME);
+      }
+    }
 
     // check if an accuracy predictor is needed
     if (_accuracyPrediction) {
@@ -319,6 +342,7 @@ protected:
         
         // read to update state
         TagEntry &tagentry = _tags[ctag];
+        policy_value_t priority;
         
         // check the prefetched state
         switch (tagentry.prefState) {
@@ -335,13 +359,17 @@ protected:
 
           // DCP CHANGE: Depromote to low priority
           // DCP-RP CHANGE: Check if we need to use reuse predictor
-          if (_reusePrediction && _eaf.test(ctag)) {
-            _tags.read(ctag, POLICY_HIGH);
-            INCREMENT(eaf_hits);
+          priority = POLICY_LOW;
+          if (_reusePrediction) {
+            policy_value_t eafPriority =
+              _eaf.test(ctag) ? POLICY_HIGH : POLICY_BIMODAL;
+            SetEntry sentry = _duelInfo[_tags.index(ctag)];
+            if ((sentry.leader && sentry.eaf) || (_psel > _pselThreshold / 2))
+              priority = eafPriority; 
+            else
+              priority = POLICY_HIGH;
           }
-          else {
-            _tags.read(ctag, POLICY_LOW);
-          }
+          _tags.read(ctag, priority);
 
 
           // update counters
@@ -367,6 +395,17 @@ protected:
         
       }
       else {
+
+        // if reuse prediction is used, update predictor
+        if (_reusePrediction || _demandReusePrediction) {
+          SetEntry sentry = _duelInfo[_tags.index(ctag)];
+          if (sentry.leader) {
+            if (sentry.eaf)
+              _psel.decrement();
+            else
+              _psel.increment();
+          }
+        }
 
         // check ipEAF if necessary
         if (_accuracyPrediction) {
@@ -464,9 +503,17 @@ protected:
 
     // if there is demand reuse prediction
     if (_demandReusePrediction &&
-        request -> type != MemoryRequest::PREFETCH &&
-        !_eaf.test(ctag)) 
-      priority = POLICY_BIMODAL;
+        request -> type != MemoryRequest::PREFETCH) {
+      policy_value_t eafPriority = _eaf.test(ctag) ? POLICY_HIGH : POLICY_BIMODAL;
+      SetEntry sentry = _duelInfo[_tags.index(ctag)];
+      if ((sentry.leader && sentry.eaf) || (_psel > _pselThreshold / 2)) {
+        priority = eafPriority; 
+      }
+      else {
+        priority = POLICY_HIGH;
+      }
+    }
+
 
     // if there is accuracy prediction
     if (_accuracyPrediction &&
