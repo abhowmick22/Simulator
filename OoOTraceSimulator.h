@@ -86,6 +86,9 @@ class OoOTraceSimulator {
       // checkpoint at warmup
       uint64 checkpointIcount;
       cycles_t checkpointCycle;
+      // checkpoint at finish
+      uint64 finishIcount;
+      cycles_t finishCycle;
       // list of outstanding requests
       list <MemoryRequest *> outstanding;
     };
@@ -132,6 +135,10 @@ class OoOTraceSimulator {
       // until all processors have finished
       while (finished.count() < _numCPUs) {
 
+        if (_queue.empty()) {
+          printf("What the hell!");
+          return;
+        }
         assert(!_queue.empty());
 
         // check if a heart beat should be issued
@@ -242,6 +249,7 @@ class OoOTraceSimulator {
 
             // check if the processor has completed run
             if (_procs[cpuID].currentIcount > _milestones[_mIndex[cpuID]].first) {
+              bool warmUpMilestone = false;
               if (!finished.test(cpuID)) {
 
                 switch (_milestones[_mIndex[cpuID]].second) {
@@ -249,15 +257,19 @@ class OoOTraceSimulator {
                   case WARM_UP:
                     _procs[cpuID].checkpointIcount = _procs[cpuID].currentIcount;
                     _procs[cpuID].checkpointCycle = _procs[cpuID].currentCycle;
+                    warmUpMilestone = true;
                     _mIndex[cpuID] ++;
                     warmUp.set(cpuID);
                     if (warmUp.count() == _numCPUs) {
                       _simulator.EndWarmUp();
                     }
+                    
                     break;
 
                   case END_SIMULATION:
                     if (!finished.test(cpuID)) {
+                      _procs[cpuID].finishIcount = _procs[cpuID].currentIcount;
+                      _procs[cpuID].finishCycle = _procs[cpuID].currentCycle;
                       finished.set(cpuID);
                       fprintf(_ipcFile, "%u %llu %llu\n", cpuID, 
                           _procs[cpuID].currentIcount - 
@@ -269,7 +281,8 @@ class OoOTraceSimulator {
                     break;
                 }
               }
-              break;
+              if (!warmUpMilestone)
+                break;
             }
           }
         }
