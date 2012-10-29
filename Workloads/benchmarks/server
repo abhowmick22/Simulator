@@ -1,5 +1,5 @@
-apache20
-tpcc64
-tpch2
-tpch6
-tpch17
+apache20 1 0
+tpch6 2 0
+tpch17 2 1
+tpch2 2 1
+tpcc64 2 1

@@ -58,6 +58,10 @@ def parse_simulation_log(bench_folder):
     data["sim"] = {"insts":{}, "cycles":{}, "ipc":{}}
     data["sim"]["throughput"] = 0
 
+    if 'llc' not in data:
+        print bench_folder
+        exit
+    
     data["llc"]["prefetches"] = data["llc"]["used_prefetches"] + data["llc"]["unused_prefetches"] + 1
     
     data["llc"]["used_prefetch_frac"] = (data["llc"]["used_prefetches"] * 100) / data["llc"]["prefetches"]
