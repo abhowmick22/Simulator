@@ -1,0 +1,6 @@
+size 256
+block-size 64
+associativity 16
+policy lru
+tag-store-latency 2
+data-store-latency 6
