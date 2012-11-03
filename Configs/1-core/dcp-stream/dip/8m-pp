@@ -5,3 +5,4 @@ llc dip/8m
 llc-mshr inf-64b
 mc normal
 override llc prefetch-request-promote 0
+override mc cmp-stall-count 150

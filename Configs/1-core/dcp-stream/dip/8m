@@ -4,3 +4,4 @@ l2-mshr 32-64b
 llc dip/8m
 llc-mshr inf-64b
 mc normal
+override mc cmp-stall-count 150

@@ -7,3 +7,4 @@ mc normal
 override llc prefetch-request-promote 0
 override llc reuse-prediction 1
 override llc demand-reuse-prediction 1
+override mc cmp-stall-count 150

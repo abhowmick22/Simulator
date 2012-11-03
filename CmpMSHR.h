@@ -128,15 +128,17 @@ class CmpMSHR : public MemoryComponent {
       // if there is already a miss for the block, then insert it at the end of
       // that block's request list
       if (_missed.find(blockAddr) != _missed.end()) {
-        if (request -> type == MemoryRequest::READ) {
-          _outstanding[blockAddr] -> type = MemoryRequest::READ;
-          request -> stalling = true;
-          _missed[blockAddr].push_back(request);
-        }
         // write requests don't stall the processor
-        else {
+        if (request -> type == MemoryRequest::WRITE) {
           request -> serviced = true;
+          return 0;
         }
+
+        if (request -> type == MemoryRequest::READ)
+          _outstanding[blockAddr] -> type = MemoryRequest::READ;
+
+        request -> stalling = true;
+        _missed[blockAddr].push_back(request);
         return 0;
       }
 
@@ -151,28 +153,28 @@ class CmpMSHR : public MemoryComponent {
 
       // assign a new MSHR to the request      
       _missed[blockAddr] = list <MemoryRequest *> ();
-      
+
       MemoryRequest *miss = new MemoryRequest(MemoryRequest::COMPONENT,
           request -> cpuID, this, MemoryRequest::READ, request -> cmpID,
           request -> virtualAddress, blockAddr, _blockSize, 
           request -> currentCycle);
 
-      _outstanding[blockAddr] = miss;
-
-      // convert a write into a partial write
-      // if (miss -> type == MemoryRequest::WRITE)
-      //  miss -> type = MemoryRequest::PARTIALWRITE;
-
+      miss -> type = request -> type;
+      if (request -> type == MemoryRequest::WRITE)
+        miss -> type = MemoryRequest::READ_FOR_WRITE;
+      
       // set icount
       miss -> icount = request -> icount;
+      
+      _outstanding[blockAddr] = miss;
 
-      if (request -> type == MemoryRequest::READ) {
-        request -> stalling = true;
-        _missed[blockAddr].push_back(request);
+
+      if (request -> type == MemoryRequest::WRITE) {
+        request -> serviced = true;
       }
       else {
-        _outstanding[blockAddr] -> type = MemoryRequest::READ_FOR_WRITE;
-        request -> serviced = true;
+        request -> stalling = true;
+        _missed[blockAddr].push_back(request);
       }
 
       SendToNextComponent(miss);

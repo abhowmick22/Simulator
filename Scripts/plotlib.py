@@ -92,11 +92,11 @@ class PlotLib:
         # ----------------------------------------------------------------------
         
         self._line_styles = ['black!40,semithick', 
-                             'dashed,black!80,semithick', 
-                             'densely dotted,semithick', 
+                             'densely dotted,thick', 
+                             'dashed,thick', 
+                             'black,thick',
                              'black!60,semithick', 
                              'densely dashed,thick', 
-                             'black,thick',
                              'red',
                              'blue',
                              ]

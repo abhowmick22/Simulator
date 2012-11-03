@@ -293,6 +293,8 @@ protected:
 
     case MemoryRequest::PREFETCH:
 
+      INCREMENT(prefetches);
+      
       if (_tags.lookup(ctag)) {
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
@@ -375,7 +377,6 @@ protected:
       _tags[ctag].prefState = PREFETCHED_UNUSED;
       _tags[ctag].prefetchCycle = request -> currentCycle;
       _tags[ctag].prefetchMiss = _missCounter[index];
-      INCREMENT(prefetches);
     }
 
     // if the evicted tag entry is valid

@@ -5,3 +5,4 @@ llc dip/512k
 llc-mshr inf-64b
 mc normal
 override llc accuracy-prediction 1
+override mc cmp-stall-count 150

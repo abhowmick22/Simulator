@@ -7,3 +7,4 @@ override mc stall-count 300
 override llc reuse-prediction 1
 override llc demand-reuse-prediction 1
 override llc accuracy-prediction 1
+override mc cmp-stall-count 150

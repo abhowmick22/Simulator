@@ -401,9 +401,6 @@ for key in copy_wo:
 
 if args.normalize is not None:
     kv.normalize(args.normalize)
-if not args.no_mean:
-    kv.append_gmean()
-    workload_order.append("gmean")
 
 
 # ------------------------------------------------------------------------------
@@ -419,6 +416,10 @@ if args.sort_workload is not None:
         new_workload_order = sorted(workload_order, 
             key = lambda workload: data[sort_set][workload])
         workload_order = new_workload_order
+
+if not args.no_mean:
+    kv.append_gmean()
+    workload_order.append("gmean")
 
 # ------------------------------------------------------------------------------
 # Check if we need to print
@@ -439,11 +440,11 @@ else:
 
 for name in set_order:
     if name not in args.ignore:
-        output = [cur + " " + str(round(val,args.round)).ljust(args.round+2,'0') for cur, val in \
+        output = [cur + "," + str(round(val,args.round)).ljust(args.round+2,'0') for cur, val in \
             zip(output, kv.values(name, key_order = print_order))]
 
 if args.print_table:
-    print ''.join([' %s' % (set_name) for set_name in set_order])
+    print ','.join(['%s' % (set_name) for set_name in set_order])
     for line in output:
         print line
 

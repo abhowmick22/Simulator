@@ -54,6 +54,7 @@ protected:
   bool _reusePrediction;
   bool _demandReusePrediction;
   bool _accuracyPrediction;
+  bool _drop;
 
   uint32 _accuracyTableSize; // same as the prefetch table size
   uint32 _prefetchDistance;
@@ -175,6 +176,7 @@ public:
     _prefetchDistance = 24;
     _accuracyCounterMax = 16;
     _pselThreshold = 1024;
+    _drop = false;
   }
 
 
@@ -202,6 +204,7 @@ public:
       CMP_PARAMETER_BOOLEAN("reuse-prediction", _reusePrediction)
       CMP_PARAMETER_BOOLEAN("demand-reuse-prediction", _demandReusePrediction)
       CMP_PARAMETER_BOOLEAN("accuracy-prediction", _accuracyPrediction)
+      CMP_PARAMETER_BOOLEAN("drop", _drop)
       
       CMP_PARAMETER_UINT("accuracy-table-size", _accuracyTableSize)
       CMP_PARAMETER_UINT("prefetch-distance", _prefetchDistance)
@@ -428,7 +431,7 @@ protected:
 
     case MemoryRequest::PREFETCH:
 
-      INCREMENT(reads);
+      INCREMENT(prefetches);
           
       if (_tags.lookup(ctag)) {
         request -> serviced = true;
@@ -440,10 +443,21 @@ protected:
         if (_prefetchRequestPromote)
           _tags.read(ctag, POLICY_HIGH);
       }
-      else {
+      else { 
+        if (_accuracyPrediction && _drop) {
+          AccuracyEntry &accEntry = _accuracyTable[request -> prefetcherID];
+          if (accEntry.counter <= (_accuracyCounterMax / 2)) {
+            request -> serviced = true;
+            if (accEntry.ipEAF.insert(ctag, true).valid)
+              accEntry.counter.decrement();
+            return _tagStoreLatency;
+          }
+          else {
+            _missCounter[index] ++;
+          }
+        }
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
       }
           
       return _tagStoreLatency;
@@ -548,7 +562,6 @@ protected:
         _tags[ctag].lowPriority = true;
       }
 
-      INCREMENT(prefetches);
     }
 
     // if the evicted tag entry is valid
