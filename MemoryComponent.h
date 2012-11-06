@@ -387,6 +387,9 @@ class MemoryComponent {
       RESET_ALL_COUNTERS;
     }
 
+    virtual void EndProcWarmUp(uint32 cpuID) {
+    }
+
 
     // -------------------------------------------------------------------------
     // Function called at a heart beat. Argument indicates cycles elapsed after

@@ -194,6 +194,12 @@ class MemorySimulator {
         (*cmp) -> EndWarmUp();
     }
 
+  void EndProcWarmUp(uint32 cpuID) {
+    list <MemoryComponent *>::iterator cmp;
+    for (cmp = _components.begin(); cmp != _components.end(); cmp ++)
+      (*cmp) -> EndProcWarmUp(cpuID);
+  }
+
 
     // -------------------------------------------------------------------------
     // Current cycle

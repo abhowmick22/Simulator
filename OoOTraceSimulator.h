@@ -260,6 +260,7 @@ class OoOTraceSimulator {
                     warmUpMilestone = true;
                     _mIndex[cpuID] ++;
                     warmUp.set(cpuID);
+                    _simulator.EndProcWarmUp(cpuID);
                     if (warmUp.count() == _numCPUs) {
                       _simulator.EndWarmUp();
                     }

@@ -83,6 +83,7 @@ protected:
   policy_value_t _pval;
 
   vector <uint32> _missCounter;
+  vector <uint64> _procMisses;
 
 
   // -------------------------------------------------------------------------
@@ -192,6 +193,7 @@ public:
     _numSets = (_size * 1024) / (_blockSize * _associativity);
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _missCounter.resize(_numSets, 0);
+    _procMisses.resize(_numCPUs, 0);
 
     switch (_policyVal) {
     case 0: _pval = POLICY_HIGH; break;
@@ -207,6 +209,17 @@ public:
   // -------------------------------------------------------------------------
 
   void HeartBeat(cycles_t hbCount) {
+  }
+
+  void EndProcWarmUp(uint32 cpuID) {
+    _procMisses[cpuID] = 0;
+  }
+
+  void EndSimulation() {
+    DUMP_STATISTICS;
+    for (uint32 i = 0; i < _numCPUs; i ++)
+      CMP_LOG("misses-%u = %llu", i, _procMisses[i]);
+    CLOSE_ALL_LOGS;
   }
 
 
@@ -287,6 +300,7 @@ protected:
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
         _missCounter[index] ++;
+        _procMisses[request -> cpuID] ++;
       }
           
       return _tagStoreLatency;
