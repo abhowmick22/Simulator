@@ -281,9 +281,9 @@ for workload in workloads:
                 "yeti",
                 "arachnid",
                 "vseshadr",
-                "crocodile",
+                # "crocodile",
                 "BOAR.ECE.CMU.EDU",
-                "SLOTH.ECE.CMU.EDU",
+                "sloth",
                 "lsubrama",
 
                 "cheetah05",

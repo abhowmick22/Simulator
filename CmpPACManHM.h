@@ -19,6 +19,7 @@
 // Standard includes
 // -----------------------------------------------------------------------------
 
+#define PACMAN_DUEL_PRIME 443
 
 // -----------------------------------------------------------------------------
 // Class: CmpPACMan
@@ -85,6 +86,16 @@ protected:
   generic_tagstore_t <addr_t, TagEntry> _tags;
   policy_value_t _pval;
 
+  // prefetch pollution predictor
+  struct SetEntry {
+    bool leader;
+    bool pacman;
+    SetEntry() { leader = false; }
+  };
+  vector <SetEntry> _duelInfo;
+  saturating_counter _psel;
+  uint32 _pselThreshold;
+
   vector <uint32> _missCounter;
   vector <uint64> _procMisses;
 
@@ -128,6 +139,7 @@ public:
     _dataStoreLatency = 15;
     _policy = "lru";
     _policyVal = 0;
+    _pselThreshold = 1024;
     _pacmanH = false;
     _pacmanM = true;
   }
@@ -205,6 +217,22 @@ public:
     case 0: _pval = POLICY_HIGH; break;
     case 1: _pval = POLICY_BIMODAL; break;
     case 2: _pval = POLICY_LOW; break;
+    }
+
+    // initialize the reuse predictor
+    if (_pacmanM) {
+      _psel = saturating_counter(_pselThreshold, _pselThreshold / 2);
+      // dueling sets
+      _duelInfo.resize(_numSets);
+      cyclic_pointer current(_numSets, 0);
+      for (int i = 0; i < 32; i ++) {
+        _duelInfo[current].leader = true;
+        _duelInfo[current].pacman = true;
+        current.add(PACMAN_DUEL_PRIME);
+        _duelInfo[current].leader = true;
+        _duelInfo[current].pacman = false;
+        current.add(PACMAN_DUEL_PRIME);
+      }
     }
   }
 
@@ -303,6 +331,16 @@ protected:
         
       }
       else {
+        if (_pacmanM) {
+          SetEntry sentry = _duelInfo[_tags.index(ctag)];
+          if (sentry.leader) {
+            if (sentry.pacman)
+              _psel.decrement();
+            else
+              _psel.increment();
+          }
+        }
+        
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
         _missCounter[index] ++;
@@ -385,13 +423,18 @@ protected:
 
     policy_value_t priority = _pval;
 
-    // pacman M
-    if (_pacmanM && request -> type == MemoryRequest::PREFETCH)
-      priority = POLICY_LOW;
-      
-
+    if (_pacmanM && request -> type == MemoryRequest::PREFETCH) {
+      SetEntry sentry = _duelInfo[_tags.index(ctag)];
+      if ((sentry.leader && sentry.pacman) || (_psel > _pselThreshold / 2)) {
+        priority = POLICY_LOW; 
+      }
+      else {
+        priority = POLICY_HIGH;
+      }
+    }
+    
     // insert the block into the cache
-    tagentry = _tags.insert(ctag, TagEntry(), _pval);
+    tagentry = _tags.insert(ctag, TagEntry(), priority);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
     _tags[ctag].dirty = dirty;
