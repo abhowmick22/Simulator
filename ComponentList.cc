@@ -30,6 +30,7 @@
 // DCP
 #include "CmpDCP.h"
 #include "CmpPACManHM.h"
+#include "CmpFDPAP.h"
 
 // -----------------------------------------------------------------------------
 // Function to create a new component
@@ -70,6 +71,7 @@ MemoryComponent *CreateComponent(string type) {
     // DCP
     COMPONENT("dcp", CmpDCP)
     COMPONENT("pacman", CmpPACMan)
+    COMPONENT("fdp-ap", CmpFDPAP)
     
   COMPONENT_LIST_END
 

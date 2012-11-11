@@ -218,6 +218,8 @@ parser.add_argument("--ignore", action = "append", default = [],
     help = "List of keys to ignore")
 parser.add_argument("--no-mean", action = "store_true", default = False,
     help = "Do not compute the mean")
+parser.add_argument("--amean", action = "store_true", default = False,
+    help = "arith mean")
 parser.add_argument("--value-base", action = "store", type = float,
     default = 0, help = "Minimum y-axis value")
 parser.add_argument("--sort-workload", action = "store", 
@@ -420,6 +422,10 @@ if args.sort_workload is not None:
 if not args.no_mean:
     kv.append_gmean()
     workload_order.append("gmean")
+
+if args.amean:
+    kv.append_amean()
+    workload_order.append("amean")
 
 # ------------------------------------------------------------------------------
 # Check if we need to print

@@ -1,12 +1,11 @@
 // -----------------------------------------------------------------------------
-// File: CmpDCP.h
+// File: CmpFDPAP.h
 // Description:
-//    Implements a last-level cache with Decouple Caching and
-//    Prefetching and prefetch monitors
+//    Implements a last-level cache with prefetch monitors
 // -----------------------------------------------------------------------------
 
-#ifndef __CMP_DCP_H__
-#define __CMP_DCP_H__
+#ifndef __CMP_FDP_AP_H__
+#define __CMP_FDP_AP_H__
 
 // -----------------------------------------------------------------------------
 // Module includes
@@ -16,24 +15,18 @@
 #include "Types.h"
 #include "GenericTagStore.h"
 
-#include "VictimTagStore.h"
-
 // -----------------------------------------------------------------------------
 // Standard includes
 // -----------------------------------------------------------------------------
 
-#define SET_DUEL_PRIME 443
 
 // -----------------------------------------------------------------------------
-// Class: CmpDCP
+// Class: CmpFDPAP
 // Description:
-//    Last-level cache with decoupled caching and prefetching.
-//
-// The changes to the baseline last-level cache are marked with a
-// comment DCP CHANGE.
+//    Baseline lastlevel cache.
 // -----------------------------------------------------------------------------
 
-class CmpDCP : public MemoryComponent {
+class CmpFDPAP : public MemoryComponent {
 
 protected:
 
@@ -45,21 +38,13 @@ protected:
   uint32 _blockSize;
   uint32 _associativity;
   string _policy;
+  uint32 _policyVal;
 
   uint32 _tagStoreLatency;
   uint32 _dataStoreLatency;
 
-  // DCP parameters
-  bool _prefetchRequestPromote;
-  bool _reusePrediction;
-  bool _demandReusePrediction;
-  bool _accuracyPrediction;
-  bool _noDCP;
-  bool _drop;
-
-  uint32 _accuracyTableSize; // same as the prefetch table size
+  uint32 _accuracyTableSize;
   uint32 _prefetchDistance;
-  uint32 _accuracyCounterMax;
 
   // -------------------------------------------------------------------------
   // Private members
@@ -80,8 +65,8 @@ protected:
 
     // prefetch related info
     PrefetchState prefState;
-    uint32 prefID;
     bool lowPriority;
+    uint32 prefID;
 
     // miss counter information
     uint32 prefetchMiss;
@@ -93,35 +78,26 @@ protected:
     
     TagEntry() {
       dirty = false;
-      lowPriority = false;
       prefState = NOT_PREFETCHED;
     }
    };
 
   // tag store
   uint32 _numSets;
+  uint32 _numBlocks;
   generic_tagstore_t <addr_t, TagEntry> _tags;
+  policy_value_t _pval;
 
-  // D-EAF reuse predictor
-  struct SetEntry {
-    bool leader;
-    bool eaf;
-    SetEntry() { leader = false; }
-  };
-  evicted_address_filter_t _eaf;
-  vector <SetEntry> _duelInfo;
-  saturating_counter _psel;
-  uint32 _pselThreshold;
-  
-
-  // accuracy predictor
   struct AccuracyEntry {
-    saturating_counter counter;
+    uint64 avg_prefetches;
+    uint64 avg_used;
+    uint64 cur_prefetches;
+    uint64 cur_used;
     generic_tagstore_t <addr_t, bool> ipEAF;
   };
 
   vector <AccuracyEntry> _accuracyTable;
-
+  
   vector <uint32> _missCounter;
   vector <uint64> _procMisses;
 
@@ -155,31 +131,22 @@ protected:
   NEW_COUNTER(prefetch_lifetime_cycle);
   NEW_COUNTER(prefetch_lifetime_miss);
 
-  NEW_COUNTER(eaf_hits);
-  
 public:
 
   // -------------------------------------------------------------------------
   // Constructor. It cannot take any arguments
   // -------------------------------------------------------------------------
 
-  CmpDCP() {
+  CmpFDPAP() {
     _size = 1024;
     _blockSize = 64;
     _associativity = 16;
     _tagStoreLatency = 6;
     _dataStoreLatency = 15;
     _policy = "lru";
-    _prefetchRequestPromote = true;
-    _reusePrediction = false;
-    _demandReusePrediction = false;
-    _accuracyPrediction = false;
+    _policyVal = 0;
     _accuracyTableSize = 16;
     _prefetchDistance = 24;
-    _accuracyCounterMax = 16;
-    _pselThreshold = 1024;
-    _noDCP = false;
-    _drop = false;
   }
 
 
@@ -200,19 +167,10 @@ public:
       CMP_PARAMETER_UINT("block-size", _blockSize)
       CMP_PARAMETER_UINT("associativity", _associativity)
       CMP_PARAMETER_STRING("policy", _policy)
+      CMP_PARAMETER_UINT("policy-value", _policyVal)
       CMP_PARAMETER_UINT("tag-store-latency", _tagStoreLatency)
       CMP_PARAMETER_UINT("data-store-latency", _dataStoreLatency)
-
-      CMP_PARAMETER_BOOLEAN("prefetch-request-promote", _prefetchRequestPromote)
-      CMP_PARAMETER_BOOLEAN("reuse-prediction", _reusePrediction)
-      CMP_PARAMETER_BOOLEAN("demand-reuse-prediction", _demandReusePrediction)
-      CMP_PARAMETER_BOOLEAN("accuracy-prediction", _accuracyPrediction)
-      CMP_PARAMETER_BOOLEAN("drop", _drop)
-      CMP_PARAMETER_BOOLEAN("no-dcp", _noDCP)
-      
       CMP_PARAMETER_UINT("accuracy-table-size", _accuracyTableSize)
-      CMP_PARAMETER_UINT("prefetch-distance", _prefetchDistance)
-      CMP_PARAMETER_UINT("accuracy-counter-max", _accuracyCounterMax)
 
     CMP_PARAMETER_END
   }
@@ -233,7 +191,7 @@ public:
 
     INITIALIZE_COUNTER(prefetches, "Total prefetches")
     INITIALIZE_COUNTER(prefetch_misses, "Prefetch misses")
-      
+
     INITIALIZE_COUNTER(predicted_accurate, "Prefetches predicted to be accurate")
     INITIALIZE_COUNTER(accurate_predicted_inaccurate, "Incorrect accuracy predictions")
     INITIALIZE_COUNTER(inaccurate_predicted_accurate, "Incorrect accuracy predictions")
@@ -249,7 +207,6 @@ public:
     INITIALIZE_COUNTER(prefetch_lifetime_cycle, "Prefetch-lifetime Cycles")
     INITIALIZE_COUNTER(prefetch_lifetime_miss, "Prefetch-lifetime Misses")
 
-    INITIALIZE_COUNTER(eaf_hits, "EAF hits")
   }
 
 
@@ -261,34 +218,24 @@ public:
 
     // compute number of sets
     _numSets = (_size * 1024) / (_blockSize * _associativity);
+    _numBlocks = _numSets * _associativity;
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _missCounter.resize(_numSets, 0);
     _procMisses.resize(_numCPUs, 0);
 
-    // initialize the reuse predictor
-    if (_reusePrediction || _demandReusePrediction) {
-      _eaf.initialize(_numSets * _associativity);
-      _psel = saturating_counter(_pselThreshold, _pselThreshold / 2);
-      // dueling sets
-      _duelInfo.resize(_numSets);
-      cyclic_pointer current(_numSets, 0);
-      for (int i = 0; i < 32; i ++) {
-        _duelInfo[current].leader = true;
-        _duelInfo[current].eaf = true;
-        current.add(SET_DUEL_PRIME);
-        _duelInfo[current].leader = true;
-        _duelInfo[current].eaf = false;
-        current.add(SET_DUEL_PRIME);
-      }
+    _accuracyTable.resize(_accuracyTableSize);
+    for (uint32 i = 0; i < _accuracyTableSize; i ++) {
+      _accuracyTable[i].avg_prefetches = 0;
+      _accuracyTable[i].avg_used = 0;
+      _accuracyTable[i].cur_prefetches = 0;
+      _accuracyTable[i].cur_used = 0;
+      _accuracyTable[i].ipEAF.SetTagStoreParameters(_prefetchDistance, 1, "fifo");
     }
 
-    // check if an accuracy predictor is needed
-    if (_accuracyPrediction) {
-      _accuracyTable.resize(_accuracyTableSize);
-      for (int i = 0; i < _accuracyTableSize; i ++) {
-        _accuracyTable[i].counter.set_max(_accuracyCounterMax);
-        _accuracyTable[i].ipEAF.SetTagStoreParameters(_prefetchDistance, 1, "fifo");
-      }
+    switch (_policyVal) {
+    case 0: _pval = POLICY_HIGH; break;
+    case 1: _pval = POLICY_BIMODAL; break;
+    case 2: _pval = POLICY_LOW; break;
     }
   }
 
@@ -352,16 +299,11 @@ protected:
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
 
-        // DCP CHANGE: Update state only for demand-fetched or
-        // already used blocks. For prefetched blocks, depromote
-        // to low priority. Code moved into switch case.
-        
         // read to update replacement policy
-        // _tags.read(ctag);
+        _tags.read(ctag);
         
         // read to update state
         TagEntry &tagentry = _tags[ctag];
-        policy_value_t priority;
         
         // check the prefetched state
         switch (tagentry.prefState) {
@@ -371,85 +313,45 @@ protected:
           tagentry.useMiss = _missCounter[index];
           tagentry.useCycle = request -> currentCycle;
 
-          // update accuracy
-          if (_accuracyPrediction) {
-            _accuracyTable[tagentry.prefID].counter.increment();
-            if (tagentry.lowPriority) {
-              tagentry.lowPriority = false;
-              INCREMENT(accurate_predicted_inaccurate);
-            }
-          }
-
-          // DCP CHANGE: Depromote to low priority
-          // DCP-RP CHANGE: Check if we need to use reuse predictor
-          priority = POLICY_HIGH;
-          if (!_noDCP)
-            priority = POLICY_LOW;
-          
-          if (_reusePrediction) {
-            policy_value_t eafPriority =
-              _eaf.test(ctag) ? POLICY_HIGH : POLICY_BIMODAL;
-            SetEntry sentry = _duelInfo[_tags.index(ctag)];
-            if ((sentry.leader && sentry.eaf) || (_psel > _pselThreshold / 2))
-              priority = eafPriority; 
-            else
-              priority = POLICY_HIGH;
-          }
-          
-          _tags.read(ctag, priority);
-
-
           // update counters
           INCREMENT(used_prefetches);
           ADD_TO_COUNTER(prefetch_use_cycle,
                          tagentry.useCycle - tagentry.prefetchCycle);
           ADD_TO_COUNTER(prefetch_use_miss,
                          tagentry.useMiss - tagentry.prefetchMiss);
+
+          _accuracyTable[tagentry.prefID].cur_used ++;
+          if (tagentry.lowPriority) {
+            tagentry.lowPriority = false;
+            INCREMENT(accurate_predicted_inaccurate);
+          }
           break;
           
         case PREFETCHED_USED:
-          _tags.read(ctag, POLICY_HIGH);
           tagentry.prefState = PREFETCHED_REUSED;
           INCREMENT(reused_prefetches);
           break;
           
         case NOT_PREFETCHED:
         case PREFETCHED_REUSED:
-          _tags.read(ctag, POLICY_HIGH);
           // do nothing
           break;
         }
         
       }
       else {
-
-        // if reuse prediction is used, update predictor
-        if (_reusePrediction || _demandReusePrediction) {
-          SetEntry sentry = _duelInfo[_tags.index(ctag)];
-          if (sentry.leader) {
-            if (sentry.eaf)
-              _psel.decrement();
-            else
-              _psel.increment();
-          }
-        }
-
-        // check ipEAF if necessary
-        if (_accuracyPrediction) {
-          if (request -> d_prefetched) {
-            AccuracyEntry &accEntry = _accuracyTable[request -> d_prefID];
-            if (accEntry.ipEAF.lookup(ctag)) {
-              accEntry.ipEAF.invalidate(ctag);
-              accEntry.counter.increment();
-              INCREMENT(accurate_predicted_inaccurate);
-            }
-          }
-        }
-        
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
         _missCounter[index] ++;
         _procMisses[request -> cpuID] ++;
+
+        if (request -> d_prefetched) {
+          AccuracyEntry &accEntry = _accuracyTable[request -> d_prefID];
+          if (accEntry.ipEAF.lookup(ctag)) {
+            accEntry.ipEAF.invalidate(ctag);
+            INCREMENT(accurate_predicted_inaccurate);
+          }
+        }
       }
           
       return _tagStoreLatency;
@@ -457,32 +359,20 @@ protected:
     case MemoryRequest::PREFETCH:
 
       INCREMENT(prefetches);
-          
+
+      _accuracyTable[request -> prefetcherID].cur_prefetches ++;
+      
       if (_tags.lookup(ctag)) {
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
 
         // read to update replacement policy
-        // if we shoule promote on a prefetch request hit?
-        // else do nothing
-        if (_prefetchRequestPromote)
-          _tags.read(ctag, POLICY_HIGH);
+        _tags.read(ctag);
       }
-      else { 
-        if (_accuracyPrediction && _drop) {
-          AccuracyEntry &accEntry = _accuracyTable[request -> prefetcherID];
-          if (accEntry.counter <= (_accuracyCounterMax / 2)) {
-            request -> serviced = true;
-            if (accEntry.ipEAF.insert(ctag, true).valid)
-              accEntry.counter.decrement();
-            return _tagStoreLatency;
-          }
-        }
-        else {
-          _missCounter[index] ++;
-        }
+      else {
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
+        _missCounter[index] ++;
       }
           
       return _tagStoreLatency;
@@ -538,35 +428,22 @@ protected:
   void INSERT_BLOCK(addr_t ctag, bool dirty, MemoryRequest *request) {
 
     table_t <addr_t, TagEntry>::entry tagentry;
-    policy_value_t priority = POLICY_HIGH;
 
-    // if there is demand reuse prediction
-    if (_demandReusePrediction &&
-        request -> type != MemoryRequest::PREFETCH) {
-      policy_value_t eafPriority = _eaf.test(ctag) ? POLICY_HIGH : POLICY_BIMODAL;
-      SetEntry sentry = _duelInfo[_tags.index(ctag)];
-      if ((sentry.leader && sentry.eaf) || (_psel > _pselThreshold / 2)) {
-        priority = eafPriority; 
-      }
-      else {
-        priority = POLICY_HIGH;
-      }
-    }
+    policy_value_t priority = _pval;
 
-
-    // if there is accuracy prediction
-    if (_accuracyPrediction &&
-        request -> type == MemoryRequest::PREFETCH) {
-      if (_accuracyTable[request -> prefetcherID].counter >
-          (_accuracyCounterMax / 2)) {
+    if (request -> type == MemoryRequest::PREFETCH) {
+      AccuracyEntry accEntry = _accuracyTable[request -> prefetcherID];
+      uint64 total = (accEntry.avg_prefetches + accEntry.cur_prefetches) / 2;
+      uint64 used = (accEntry.avg_used + accEntry.cur_used) / 2;
+      if (used * 2 > total) {
         priority = POLICY_HIGH;
         INCREMENT(predicted_accurate);
       }
       else {
         priority = POLICY_LOW;
       }
-    }      
-
+    }
+    
     // insert the block into the cache
     tagentry = _tags.insert(ctag, TagEntry(), priority);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
@@ -580,24 +457,28 @@ protected:
     // Handle prefetch
     if (request -> type == MemoryRequest::PREFETCH) {
       _tags[ctag].prefState = PREFETCHED_UNUSED;
-      _tags[ctag].prefID = request -> prefetcherID;
       _tags[ctag].prefetchCycle = request -> currentCycle;
       _tags[ctag].prefetchMiss = _missCounter[index];
-      if (priority == POLICY_LOW) {
-        _tags[ctag].lowPriority = true;
-      }
-
+      _tags[ctag].prefID = request -> prefetcherID;
+      if (priority == POLICY_LOW) _tags[ctag].lowPriority = true;
     }
 
     // if the evicted tag entry is valid
     if (tagentry.valid) {
       INCREMENT(evictions);
-      // insert into eaf it its not an unused prefetch
-      if (_reusePrediction) {
-        if (tagentry.value.prefState != PREFETCHED_UNUSED)
-          _eaf.insert(tagentry.key);
+
+      if ((evictions % (_numBlocks / 2)) == 0) {
+        for (uint32 i = 0; i < _accuracyTableSize; i ++) {
+          AccuracyEntry &accEntry = _accuracyTable[i];
+          uint64 total = (accEntry.avg_prefetches + accEntry.cur_prefetches) / 2;
+          uint64 used = (accEntry.avg_used + accEntry.cur_used) / 2;
+          accEntry.avg_prefetches = total;
+          accEntry.avg_used = used;
+          accEntry.cur_prefetches = 0;
+          accEntry.cur_used = 0;
+        }
       }
-      
+
       // check prefetched state
       switch (tagentry.value.prefState) {
       case PREFETCHED_UNUSED:
@@ -607,19 +488,12 @@ protected:
         ADD_TO_COUNTER(prefetch_lifetime_miss,
                        _missCounter[index] - tagentry.value.prefetchMiss);
 
-        // if accuracy prediction is enabled, update the accuracy table
-        if (_accuracyPrediction) {
-          AccuracyEntry &accEntry = _accuracyTable[tagentry.value.prefID];
-          if (tagentry.value.lowPriority) {
-            if (accEntry.ipEAF.insert(tagentry.key, true).valid)
-              accEntry.counter.decrement();
-          }
-          else {
-            accEntry.counter.decrement();
-            INCREMENT(inaccurate_predicted_accurate);
-          }
+        if (tagentry.value.lowPriority) {
+          _accuracyTable[tagentry.value.prefID].ipEAF.insert(tagentry.key, true);
         }
-        
+        else {
+          INCREMENT(inaccurate_predicted_accurate);
+        }
         break;
         
       case PREFETCHED_USED:
@@ -657,4 +531,4 @@ protected:
   }
 };
 
-#endif // __CMP_DCP_H__
+#endif // __CMP_FDP_AP_H__
