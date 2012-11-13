@@ -6,6 +6,7 @@ l2-2 256k64b8wayLRU
 l2-mshr-2 32-64b
 llc dip/1m
 llc-mshr inf-64b
-override mc stall-count 300
-override llc accuracy-prediction 1
+override mc stall-count 200
 override mc cmp-stall-count 0
+override llc accuracy-prediction 1
+override llc use-accuracy-prefetch-hit 1

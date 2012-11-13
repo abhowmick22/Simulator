@@ -56,6 +56,7 @@ protected:
   bool _accuracyPrediction;
   bool _noDCP;
   bool _drop;
+  bool _useAccuracyPrefetchHit;
 
   uint32 _accuracyTableSize; // same as the prefetch table size
   uint32 _prefetchDistance;
@@ -180,6 +181,7 @@ public:
     _pselThreshold = 1024;
     _noDCP = false;
     _drop = false;
+    _useAccuracyPrefetchHit = false;
   }
 
 
@@ -209,6 +211,7 @@ public:
       CMP_PARAMETER_BOOLEAN("accuracy-prediction", _accuracyPrediction)
       CMP_PARAMETER_BOOLEAN("drop", _drop)
       CMP_PARAMETER_BOOLEAN("no-dcp", _noDCP)
+      CMP_PARAMETER_BOOLEAN("use-accuracy-prefetch-hit", _useAccuracyPrefetchHit)
       
       CMP_PARAMETER_UINT("accuracy-table-size", _accuracyTableSize)
       CMP_PARAMETER_UINT("prefetch-distance", _prefetchDistance)
@@ -462,10 +465,21 @@ protected:
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
 
+        
+        // if accuracy predictor should be used on prefetch hits
+        if (_accuracyPrediction && _useAccuracyPrefetchHit) {
+          // promote if accurate prefetch
+          AccuracyEntry &accEntry = _accuracyTable[request -> prefetcherID];
+          if (accEntry.counter > (_accuracyCounterMax / 2)) {
+            _tags.read(ctag, POLICY_HIGH);
+            INCREMENT(predicted_accurate);
+          }
+        }
+        
         // read to update replacement policy
         // if we shoule promote on a prefetch request hit?
         // else do nothing
-        if (_prefetchRequestPromote)
+        else if (_prefetchRequestPromote)
           _tags.read(ctag, POLICY_HIGH);
       }
       else { 

@@ -140,7 +140,7 @@ public:
     _policy = "lru";
     _policyVal = 0;
     _pselThreshold = 1024;
-    _pacmanH = false;
+    _pacmanH = true;
     _pacmanM = true;
   }
 

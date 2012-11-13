@@ -62,16 +62,16 @@ def parse_simulation_log(bench_folder):
         print bench_folder
         exit
     
-    data["llc"]["prefetches"] = data["llc"]["used_prefetches"] + data["llc"]["unused_prefetches"] + 1
+    data["llc"]["ins_prefetches"] = data["llc"]["used_prefetches"] + data["llc"]["unused_prefetches"] + 1
     
-    data["llc"]["used_prefetch_frac"] = (data["llc"]["used_prefetches"] * 100) / data["llc"]["prefetches"]
-    data["llc"]["unused_prefetch_frac"] = (data["llc"]["unused_prefetches"] * 100) / data["llc"]["prefetches"]
+    data["llc"]["used_prefetch_frac"] = (data["llc"]["used_prefetches"] * 100) / data["llc"]["ins_prefetches"]
+    data["llc"]["unused_prefetch_frac"] = (data["llc"]["unused_prefetches"] * 100) / data["llc"]["ins_prefetches"]
 
     if "predicted_accurate" in data["llc"]:
-        data["llc"]["predicted_accurate_frac"] = (data["llc"]["predicted_accurate"] * 100) / data["llc"]["prefetches"]
-        data["llc"]["accurate_predicted_inaccurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["prefetches"]
-        data["llc"]["inaccurate_predicted_accurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["prefetches"]
-        data["llc"]["incorrect_frac"] = ((data["llc"]["accurate_predicted_inaccurate"] + data["llc"]["inaccurate_predicted_accurate"]) * 100) / data["llc"]["prefetches"]
+        data["llc"]["predicted_accurate_frac"] = (data["llc"]["predicted_accurate"] * 100) / data["llc"]["ins_prefetches"]
+        data["llc"]["accurate_predicted_inaccurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["ins_prefetches"]
+        data["llc"]["inaccurate_predicted_accurate_frac"] = (data["llc"]["accurate_predicted_inaccurate"] * 100) / data["llc"]["ins_prefetches"]
+        data["llc"]["incorrect_frac"] = ((data["llc"]["accurate_predicted_inaccurate"] + data["llc"]["inaccurate_predicted_accurate"]) * 100) / data["llc"]["ins_prefetches"]
     
     data["llc"]["used_prefetches"] += 1
     data["llc"]["reused_prefetch_frac"] = (data["llc"]["reused_prefetches"] * 100) / data["llc"]["used_prefetches"]
@@ -81,8 +81,8 @@ def parse_simulation_log(bench_folder):
     data["llc"]["prefetch_use_miss"] = (data["llc"]["prefetch_use_miss"]) /data["llc"]["used_prefetches"]
     
     
-    data["llc"]["prefetch_lifetime_cycle"] = (data["llc"]["prefetch_lifetime_cycle"]) /data["llc"]["prefetches"]
-    data["llc"]["prefetch_lifetime_miss"] = (data["llc"]["prefetch_lifetime_miss"]) /data["llc"]["prefetches"]
+    data["llc"]["prefetch_lifetime_cycle"] = (data["llc"]["prefetch_lifetime_cycle"]) /data["llc"]["ins_prefetches"]
+    data["llc"]["prefetch_lifetime_miss"] = (data["llc"]["prefetch_lifetime_miss"]) /data["llc"]["ins_prefetches"]
 
 
     fin = open(bench_folder + "/sim.ipc", "r")

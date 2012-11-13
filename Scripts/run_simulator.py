@@ -69,6 +69,8 @@ parser.add_argument("--debug", action = "store_true", default = False, \
     help = "run in debug mode")
 parser.add_argument("--no-nice", action = "store_true", default = False, \
     help = "run jobs as not nice user")
+parser.add_argument("--no-workload-print", action = "store_true", default = False, \
+    help = "do not print the workload information")
 parser.add_argument("--synthetic", action = "store_true", default = False, \
     help = "use a synthetic trace")
 
@@ -138,14 +140,15 @@ for config in configs:
     print config
 print
 print
-print "Workloads: "
-if args.workload_file is not None:
-    os.system("cat " + workload_file)
-if args.workload is not None:
-    for wl in args.workload:
-        print wl
-print
-print
+if not args.no_workload_print:
+    print "Workloads: "
+    if args.workload_file is not None:
+        os.system("cat " + workload_file)
+    if args.workload is not None:
+        for wl in args.workload:
+            print wl
+    print
+    print
 
 if args.list:
     quit()
