@@ -1,0 +1,10 @@
+applu-art-bwaves-facerec-fma3d-galgel-omnetpp-swim
+ammp-bwaves-bzip2-facerec-h264ref-leslie3d-mcf-swim
+ammp-art-cactusADM-fma3d-galgel-mcf-omnetpp-swim
+ammp-art-fma3d-galgel-lbm-omnetpp-parser-swim
+art-bzip2-equake-h264ref-leslie3d-soplex-twolf-xalancbmk
+art-bwaves-bzip2-mcf-parser-twolf-xalancbmk-zeusmp
+apsi-art-bwaves-equake-omnetpp-parser-swim-vpr
+applu-facerec-leslie3d-milc-sphinx3-swim-twolf-vpr
+applu-bzip2-lbm-mcf-swim-twolf-xalancbmk-zeusmp
+ammp-applu-astar-leslie3d-libquantum-omnetpp-twolf-xalancbmk

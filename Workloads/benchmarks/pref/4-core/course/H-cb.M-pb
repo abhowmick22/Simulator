@@ -1,0 +1,16 @@
+bzip2-swim-swim-vpr
+art-mcf-mcf-swim
+art-facerec-soplex-twolf
+art-parser-swim-twolf
+art-art-mcf-parser
+facerec-mcf-soplex-swim
+parser-swim-swim-twolf
+art-facerec-mcf-soplex
+gcc-parser-swim-swim
+art-lbm-vpr-vpr
+h264ref-mcf-swim-xalancbmk
+cactusADM-mgrid-swim-vpr
+art-mgrid-omnetpp-vpr
+galgel-omnetpp-swim-twolf
+equake-facerec-twolf-xalancbmk
+art-bzip2-cactusADM-galgel

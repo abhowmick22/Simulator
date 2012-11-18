@@ -255,7 +255,7 @@ for workload in workloads:
 
         else:
 
-            condor_folder = CONDOR_BASE_FOLDER + ".condor3/" + \
+            condor_folder = CONDOR_BASE_FOLDER + ".condor4/" + \
                 commands.getoutput("date +%m.%d-%a-%H.%M.%S").strip() + "-" + \
                 "-".join(benchmarks) + "-" + str(random.randint(1,10000))
 

@@ -66,10 +66,11 @@ protected:
 
     // prefetch related info
     PrefetchState prefState;
+    bool lowPriority;
 
     // miss counter information
-    uint32 prefetchMiss;
-    uint32 useMiss;
+    uint64 prefetchMiss;
+    uint64 useMiss;
     
     // cycle information
     cycles_t prefetchCycle;
@@ -77,6 +78,7 @@ protected:
     
     TagEntry() {
       dirty = false;
+      lowPriority = false;
       prefState = NOT_PREFETCHED;
     }
    };
@@ -96,7 +98,7 @@ protected:
   saturating_counter _psel;
   uint32 _pselThreshold;
 
-  vector <uint32> _missCounter;
+  vector <uint64> _missCounter;
   vector <uint64> _procMisses;
 
 
@@ -301,6 +303,8 @@ protected:
         
         // read to update state
         TagEntry &tagentry = _tags[ctag];
+
+        tagentry.lowPriority = false;
         
         // check the prefetched state
         switch (tagentry.prefState) {
@@ -343,8 +347,8 @@ protected:
         
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
-        _procMisses[request -> cpuID] ++;
+        //_missCounter[index] ++;
+        if (!_done.test(request -> cpuID)) _procMisses[request -> cpuID] ++;
       }
           
       return _tagStoreLatency;
@@ -356,6 +360,8 @@ protected:
       if (_tags.lookup(ctag)) {
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
+        
+        _tags[ctag].lowPriority = false;
 
         // read to update replacement policy
         if (!_pacmanH)
@@ -364,7 +370,7 @@ protected:
       else {
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
+        //_missCounter[index] ++;
       }
           
       return _tagStoreLatency;
@@ -426,7 +432,7 @@ protected:
     if (_pacmanM && request -> type == MemoryRequest::PREFETCH) {
       SetEntry sentry = _duelInfo[_tags.index(ctag)];
       if ((sentry.leader && sentry.pacman) || (_psel > _pselThreshold / 2)) {
-        priority = POLICY_LOW; 
+        priority = POLICY_LOW;
       }
       else {
         priority = POLICY_HIGH;
@@ -440,6 +446,10 @@ protected:
     _tags[ctag].dirty = dirty;
     _tags[ctag].appID = request -> cpuID;
     _tags[ctag].prefState = NOT_PREFETCHED;
+
+    if (priority == POLICY_LOW) {
+      _tags[ctag].lowPriority = true;
+    }
 
     uint32 index = _tags.index(ctag);
 
@@ -483,6 +493,9 @@ protected:
         // do nothing
         break;
       }
+
+      if (!tagentry.value.lowPriority)
+        _missCounter[index] ++;
 
       if (tagentry.value.dirty) {
         INCREMENT(dirty_evictions);

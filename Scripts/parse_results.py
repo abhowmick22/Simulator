@@ -238,6 +238,8 @@ parser.add_argument("--print-table", action = "store_true", default = False,
     help = "Print a table of gathered data")
 parser.add_argument("--only-mean", action = "store_true", default = False,
     help = "Print only the geometric mean")
+parser.add_argument("--no-header", action = "store_true", default = False,
+    help = "Do not print the header")
 parser.add_argument("--workload-name", action = "store", 
     help = "Name for the workload")
 parser.add_argument("--justify-width", action = "store", type = int, 
@@ -450,7 +452,7 @@ for name in set_order:
             zip(output, kv.values(name, key_order = print_order))]
 
 if args.print_table:
-    print ','.join(['%s' % (set_name) for set_name in set_order])
+    if not args.no_header: print ','.join(['%s' % (set_name) for set_name in set_order])
     for line in output:
         print line
 

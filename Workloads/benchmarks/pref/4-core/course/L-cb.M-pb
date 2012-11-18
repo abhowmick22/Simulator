@@ -1,0 +1,16 @@
+GemsFDTD-gcc-lucas-milc
+GemsFDTD-bwaves-milc-milc
+GemsFDTD-gcc-wupwise-wupwise
+gcc-lucas-zeusmp-zeusmp
+gcc-lucas-wupwise-zeusmp
+gcc-lbm-libquantum-milc
+bwaves-gcc-libquantum-milc
+gcc-libquantum-wupwise-zeusmp
+bwaves-gcc-gromacs-leslie3d
+astar-bwaves-cactusADM-lucas
+lbm-milc-soplex-zeusmp
+gcc-h264ref-leslie3d-wupwise
+fma3d-gcc-sphinx3-zeusmp
+GemsFDTD-astar-lbm-omnetpp
+astar-libquantum-milc-sphinx3
+GemsFDTD-bwaves-mcf-milc

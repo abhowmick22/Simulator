@@ -300,7 +300,7 @@ protected:
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
         _missCounter[index] ++;
-        _procMisses[request -> cpuID] ++;
+        if (!_done.test(request -> cpuID)) _procMisses[request -> cpuID] ++;
       }
           
       return _tagStoreLatency;

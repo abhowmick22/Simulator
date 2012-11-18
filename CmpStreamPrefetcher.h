@@ -46,6 +46,8 @@ protected:
   uint32 _trainDistance;
   uint32 _distance;
   uint32 _degree;
+  uint32 _maxFakeCounter;
+  bool _fake;
 
 
   // -------------------------------------------------------------------------
@@ -64,6 +66,11 @@ protected:
     addr_t allocMissAddress;
     addr_t ip;
 
+    // app ID
+    uint32 appID;
+    uint64 counterVal;
+    bool faked;
+
     // start and end pointers of the stream
     addr_t sp;
     addr_t ep;
@@ -72,11 +79,19 @@ protected:
     addr_t psp;
     addr_t pep;
 
+    // last fake
+    addr_t last_demand_v;
+    addr_t last_demand_p;
+    addr_t fake_vp;
+    addr_t fake_pp;
+
     // is the prefetcher trained
     int trainHits;
     bool trained;
     StreamDirection direction;
   };
+
+  vector <uint64> _appCounter;
   
   // Prefetcher table
   generic_table_t <uint32, StreamEntry> _streamTable;
@@ -112,6 +127,8 @@ public:
     _numTrains = 2;
     _distance = 24;
     _degree = 4;
+    _maxFakeCounter = 16;
+    _fake = false;
   }
 
 
@@ -130,6 +147,7 @@ public:
       // Add the list of parameters to the component here
       CMP_PARAMETER_UINT("block-size", _blockSize)
       CMP_PARAMETER_BOOLEAN("prefetch-on-write", _prefetchOnWrite)
+      CMP_PARAMETER_BOOLEAN("fake", _fake)
 
       CMP_PARAMETER_UINT("table-size", _tableSize)
       CMP_PARAMETER_STRING("table-policy", _tablePolicy)
@@ -137,6 +155,7 @@ public:
       CMP_PARAMETER_UINT("num-trains", _numTrains)
       CMP_PARAMETER_UINT("distance", _distance)
       CMP_PARAMETER_UINT("degree", _degree)
+      CMP_PARAMETER_UINT("max-fake-counter", _maxFakeCounter)
 
     CMP_PARAMETER_END
  }
@@ -158,6 +177,8 @@ public:
   void StartSimulation() {
     _streamTable.SetTableParameters(_tableSize, _tablePolicy);
     _runningIndex = 0;
+
+    _appCounter.resize(_numCPUs, 0);
 
     _trainAddrDistance = _trainDistance * _blockSize;
     _prefetchAddrDistance = _distance * _blockSize;
@@ -194,6 +215,8 @@ protected:
       // do nothing
       return 0;
     }
+
+    _appCounter[request -> cpuID] ++;
 
     addr_t vcla = VBLOCK_ADDRESS(request, _blockSize);
     addr_t pcla = PBLOCK_ADDRESS(request, _blockSize);
@@ -245,6 +268,8 @@ protected:
       
       // real read to modify stream entry state
       StreamEntry &entry = _streamTable[key];
+      entry.counterVal = _appCounter[entry.appID];
+      entry.faked = false;
 
       // entry not trained yet
       if (!entry.trained) {
@@ -306,6 +331,10 @@ protected:
         request -> d_prefID = row.index;
 
         int32 numPrefetches = 0;
+
+        // start points to current demand
+        entry.sp = vcla;
+        entry.psp = pcla;
         
         // determine number of prefetches to issue
         int32 maxPrefetches = 0;
@@ -335,6 +364,65 @@ protected:
 
         ADD_TO_COUNTER(num_prefetches, numPrefetches);
 
+        // issue fake reads
+        int32 numFakes;
+
+        addr_t vcurrent, pcurrent;
+
+        if (_fake) {
+          if (entry.direction == FORWARD) {
+            vcurrent = entry.last_demand_v + _blockSize;
+            pcurrent = entry.last_demand_p + _blockSize;
+            numFakes = (int32)((int64)vcla - vcurrent) / _blockSize;
+            if (numFakes <= _distance) {
+              entry.faked = true;
+              for (int32 i = 0; i < numFakes; i ++) {
+                MemoryRequest *fake =
+                  new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                                    MemoryRequest::FAKE_READ, request -> cmpID,
+                                    vcurrent, pcurrent, _blockSize,
+                                    request -> currentCycle);
+                fake -> icount = request -> icount;
+                fake -> ip = request -> ip;
+                fake -> prefetcherID = row.index;
+                SendToNextComponent(fake);
+                entry.fake_vp = vcurrent;
+                entry.fake_pp = pcurrent;
+                vcurrent += _blockSize;
+                pcurrent += _blockSize;
+              }
+            }
+          }
+          else if (entry.direction == BACKWARD) {
+            vcurrent = entry.last_demand_v - _blockSize;
+            pcurrent = entry.last_demand_p - _blockSize;
+            numFakes = (int32)((int64)vcurrent - vcla) / _blockSize;
+            if (numFakes <= _distance) {
+              entry.faked = true;
+              for (int32 i = 0; i < numFakes; i ++) {
+                MemoryRequest *fake =
+                  new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                                    MemoryRequest::FAKE_READ, request -> cmpID,
+                                    vcurrent, pcurrent, _blockSize,
+                                    request -> currentCycle);
+                fake -> icount = request -> icount;
+                fake -> ip = request -> ip;
+                fake -> prefetcherID = row.index;
+                entry.fake_vp = vcurrent;
+                entry.fake_pp = pcurrent;
+                SendToNextComponent(fake);
+                vcurrent -= _blockSize;
+                pcurrent -= _blockSize;
+              }
+            }
+          }
+        }
+
+        //        printf("-- fakes = %d\n", numFakes);
+
+        entry.last_demand_v = vcla;
+        entry.last_demand_p = pcla;
+        
         if (entry.direction == FORWARD &&
             (entry.ep - entry.sp) > _prefetchAddrDistance) {
           entry.sp = entry.ep - _prefetchAddrDistance;
@@ -366,19 +454,72 @@ protected:
     else {
       // Create a new stream entry
       StreamEntry entry;
+      table_t <uint32, StreamEntry>::entry evicted;
       entry.allocMissAddress = vcla;
       entry.ip = request -> ip;
+      entry.appID = request -> cpuID;
+      entry.counterVal = _appCounter[entry.appID];
       entry.sp = vcla;
       entry.ep = vcla;
+      entry.last_demand_v = vcla;
+      entry.fake_vp = vcla;
       entry.psp = pcla;
       entry.pep = pcla;
+      entry.last_demand_p = pcla;
+      entry.fake_pp = pcla;
       entry.trainHits = 0;
       entry.trained = false;
+      entry.faked = false;
       entry.direction = NONE;
-      _streamTable.insert(_runningIndex, entry);
+      evicted = _streamTable.insert(_runningIndex, entry);
       _runningIndex ++;
+      
+      if (_fake && evicted.valid && evicted.value.trained) {
+        // issue fake reads
+        addr_t vcurrent = evicted.value.sp;
+        addr_t pcurrent = evicted.value.psp;
+        int32 numFakes;
+        if (evicted.value.direction == FORWARD && (evicted.value.sp < evicted.value.ep)) {
+          numFakes = (int32)(evicted.value.ep - evicted.value.sp)/_blockSize;
+          if (numFakes < _distance) {
+            
+            for (int32 i = 0; i < numFakes; i ++) {
+              MemoryRequest *fake =
+                new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                                  MemoryRequest::FAKE_READ, request -> cmpID,
+                                  vcurrent, pcurrent, _blockSize,
+                                  request -> currentCycle);
+              fake -> icount = request -> icount;
+              fake -> ip = request -> ip;
+              fake -> prefetcherID = row.index;
+              SendToNextComponent(fake);
+              vcurrent += _blockSize;
+              pcurrent += _blockSize;
+            }
+          }
+        }
+        else if (evicted.value.direction == BACKWARD && (evicted.value.sp > evicted.value.ep)) {
+          numFakes = (int32)(evicted.value.sp - evicted.value.ep)/_blockSize;
+          if (numFakes <= _distance) {
+            for (int32 i = 0; i < numFakes; i ++) {
+              MemoryRequest *fake =
+                new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                                  MemoryRequest::FAKE_READ, request -> cmpID,
+                                  vcurrent, pcurrent, _blockSize,
+                                  request -> currentCycle);
+              fake -> icount = request -> icount;
+              fake -> ip = request -> ip;
+              fake -> prefetcherID = row.index;
+              SendToNextComponent(fake);
+              vcurrent -= _blockSize;
+              pcurrent -= _blockSize;
+            }
+          }
+        }
+        // printf("-- Enum fakes = %d\n", numFakes);
+      }
     }
-    
+      
     return 0; 
   }
 
@@ -390,7 +531,7 @@ protected:
     
   cycles_t ProcessReturn(MemoryRequest *request) {
 
-    // if its a prefetch from this component, delete it
+    // if its a prefetch/fake from this component, delete it
     if (request -> iniType == MemoryRequest::COMPONENT &&
         request -> iniPtr == this) {
       request -> destroy = true;

@@ -24,6 +24,7 @@
 #include <list>
 #include <cstdio>
 #include <string>
+#include <bitset>
 #include <queue>
 #include <map>
 
@@ -232,6 +233,8 @@ class MemoryComponent {
     // number of cpus
     uint32 _numCPUs;
 
+  bitset <128> _done;
+
     // simulation folder
     string _simulationFolderName;
     // simulation log
@@ -267,6 +270,7 @@ class MemoryComponent {
       _stats.clear();
       _statsOrder.clear();
       _logs.clear();
+      _done.reset();
     }
 
 
@@ -307,6 +311,7 @@ class MemoryComponent {
       _hier = hier;
       _simulatorCycle = simCycle;
       _numCPUs = (*hier).size();
+      _done.reset();
     }
 
 
@@ -389,6 +394,12 @@ class MemoryComponent {
 
     virtual void EndProcWarmUp(uint32 cpuID) {
     }
+
+    virtual void EndProcSimulation(uint32 cpuID) {
+      _done.set(cpuID);
+    }
+
+ 
 
 
     // -------------------------------------------------------------------------

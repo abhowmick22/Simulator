@@ -57,6 +57,7 @@ protected:
   bool _noDCP;
   bool _drop;
   bool _useAccuracyPrefetchHit;
+  bool _handleFake;
 
   uint32 _accuracyTableSize; // same as the prefetch table size
   uint32 _prefetchDistance;
@@ -83,10 +84,12 @@ protected:
     PrefetchState prefState;
     uint32 prefID;
     bool lowPriority;
+    bool fakeDemoted;
+    bool dcpDemoted;
 
     // miss counter information
-    uint32 prefetchMiss;
-    uint32 useMiss;
+    uint64 prefetchMiss;
+    uint64 useMiss;
     
     // cycle information
     cycles_t prefetchCycle;
@@ -95,6 +98,8 @@ protected:
     TagEntry() {
       dirty = false;
       lowPriority = false;
+      fakeDemoted = false;
+      dcpDemoted = false;
       prefState = NOT_PREFETCHED;
     }
    };
@@ -123,7 +128,7 @@ protected:
 
   vector <AccuracyEntry> _accuracyTable;
 
-  vector <uint32> _missCounter;
+  vector <uint64> _missCounter;
   vector <uint64> _procMisses;
 
 
@@ -140,6 +145,12 @@ protected:
 
   NEW_COUNTER(prefetches);
   NEW_COUNTER(prefetch_misses);
+  
+  NEW_COUNTER(fake_reads);
+  NEW_COUNTER(fake_read_hits);
+
+  NEW_COUNTER(incorrect_fake_demotions);
+  NEW_COUNTER(incorrect_dcp_demotions);
 
   NEW_COUNTER(predicted_accurate);
   NEW_COUNTER(accurate_predicted_inaccurate);
@@ -149,6 +160,12 @@ protected:
   NEW_COUNTER(used_prefetches);
   NEW_COUNTER(unreused_prefetches);
   NEW_COUNTER(reused_prefetches);
+
+  NEW_COUNTER(evicted_pref);
+  NEW_COUNTER(evicted_unused_pref);
+  NEW_COUNTER(evicted_unused_pref_faked);
+  NEW_COUNTER(evicted_usedonce_pref);
+  NEW_COUNTER(evicted_reused_pref);
 
   NEW_COUNTER(prefetch_use_cycle);
   NEW_COUNTER(prefetch_use_miss);
@@ -171,7 +188,7 @@ public:
     _tagStoreLatency = 6;
     _dataStoreLatency = 15;
     _policy = "lru";
-    _prefetchRequestPromote = true;
+    _prefetchRequestPromote = false;
     _reusePrediction = false;
     _demandReusePrediction = false;
     _accuracyPrediction = false;
@@ -182,6 +199,7 @@ public:
     _noDCP = false;
     _drop = false;
     _useAccuracyPrefetchHit = false;
+    _handleFake = false;
   }
 
 
@@ -212,6 +230,7 @@ public:
       CMP_PARAMETER_BOOLEAN("drop", _drop)
       CMP_PARAMETER_BOOLEAN("no-dcp", _noDCP)
       CMP_PARAMETER_BOOLEAN("use-accuracy-prefetch-hit", _useAccuracyPrefetchHit)
+      CMP_PARAMETER_BOOLEAN("handle-fake", _handleFake)
       
       CMP_PARAMETER_UINT("accuracy-table-size", _accuracyTableSize)
       CMP_PARAMETER_UINT("prefetch-distance", _prefetchDistance)
@@ -236,6 +255,11 @@ public:
 
     INITIALIZE_COUNTER(prefetches, "Total prefetches")
     INITIALIZE_COUNTER(prefetch_misses, "Prefetch misses")
+
+    INITIALIZE_COUNTER(fake_reads, "Fake reads")
+    INITIALIZE_COUNTER(fake_read_hits, "Fake read hits")
+    INITIALIZE_COUNTER(incorrect_fake_demotions, "Incorrect fake demotions")
+    INITIALIZE_COUNTER(incorrect_dcp_demotions, "Incorrect dcp demotions")
       
     INITIALIZE_COUNTER(predicted_accurate, "Prefetches predicted to be accurate")
     INITIALIZE_COUNTER(accurate_predicted_inaccurate, "Incorrect accuracy predictions")
@@ -246,6 +270,12 @@ public:
     INITIALIZE_COUNTER(unreused_prefetches, "Unreused prefetches")
     INITIALIZE_COUNTER(reused_prefetches, "Reused prefetches")
 
+      INITIALIZE_COUNTER(evicted_pref, "Evicted prefetch")
+      INITIALIZE_COUNTER(evicted_unused_pref, "Evicted unused prefetch")
+      INITIALIZE_COUNTER(evicted_unused_pref_faked, "Evicted unused prefetch faked")
+      INITIALIZE_COUNTER(evicted_usedonce_pref, "Evicted used once prefetch")
+      INITIALIZE_COUNTER(evicted_reused_pref, "Evicted prefetch")
+      
     INITIALIZE_COUNTER(prefetch_use_cycle, "Prefetch-to-use Cycles")
     INITIALIZE_COUNTER(prefetch_use_miss, "Prefetch-to-use Misses")
 
@@ -374,6 +404,11 @@ protected:
           tagentry.useMiss = _missCounter[index];
           tagentry.useCycle = request -> currentCycle;
 
+          // check if block was fake demoted
+          if (tagentry.fakeDemoted)
+            INCREMENT(incorrect_fake_demotions);
+          tagentry.fakeDemoted = false;
+
           // update accuracy
           if (_accuracyPrediction) {
             _accuracyTable[tagentry.prefID].counter.increment();
@@ -386,33 +421,35 @@ protected:
           // DCP CHANGE: Depromote to low priority
           // DCP-RP CHANGE: Check if we need to use reuse predictor
           priority = POLICY_HIGH;
-          if (!_noDCP)
+          if (!_noDCP) {
             priority = POLICY_LOW;
+            tagentry.dcpDemoted = true;
+          }
           
           if (_reusePrediction) {
             policy_value_t eafPriority =
-              _eaf.test(ctag) ? POLICY_HIGH : POLICY_BIMODAL;
+              _eaf.test(ctag) ? POLICY_HIGH : POLICY_LOW;
             SetEntry sentry = _duelInfo[_tags.index(ctag)];
             if ((sentry.leader && sentry.eaf) || (_psel > _pselThreshold / 2))
               priority = eafPriority; 
             else
               priority = POLICY_HIGH;
+
+            if (priority == POLICY_LOW) tagentry.dcpDemoted = true;
           }
           
           _tags.read(ctag, priority);
 
-
           // update counters
           INCREMENT(used_prefetches);
-          ADD_TO_COUNTER(prefetch_use_cycle,
-                         tagentry.useCycle - tagentry.prefetchCycle);
-          ADD_TO_COUNTER(prefetch_use_miss,
-                         tagentry.useMiss - tagentry.prefetchMiss);
           break;
           
         case PREFETCHED_USED:
           _tags.read(ctag, POLICY_HIGH);
           tagentry.prefState = PREFETCHED_REUSED;
+          if (tagentry.dcpDemoted)
+            INCREMENT(incorrect_dcp_demotions);
+          tagentry.dcpDemoted = false;
           INCREMENT(reused_prefetches);
           break;
           
@@ -451,11 +488,29 @@ protected:
         
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
-        _procMisses[request -> cpuID] ++;
+        // _missCounter[index] ++;
+        if (!_done.test(request -> cpuID)) _procMisses[request -> cpuID] ++;
       }
           
       return _tagStoreLatency;
+
+    case MemoryRequest::FAKE_READ:
+      INCREMENT(fake_reads);
+      if (_handleFake) {
+        if (_tags.lookup(ctag)) {
+          TagEntry &tagentry = _tags[ctag];
+          if (tagentry.prefState == PREFETCHED_UNUSED) {
+            INCREMENT(fake_read_hits);
+            tagentry.fakeDemoted = true;
+            tagentry.useMiss = _missCounter[index];
+            tagentry.useCycle = request -> currentCycle;
+            // demote the block
+            _tags.read(ctag, POLICY_LOW);
+          }
+        }          
+      }
+      request -> serviced = true;
+      return 0;
 
     case MemoryRequest::PREFETCH:
 
@@ -492,9 +547,9 @@ protected:
             return _tagStoreLatency;
           }
         }
-        else {
-          _missCounter[index] ++;
-        }
+        //        else {
+        //          _missCounter[index] ++;
+        //        }
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
       }
@@ -606,20 +661,38 @@ protected:
     // if the evicted tag entry is valid
     if (tagentry.valid) {
       INCREMENT(evictions);
+
+      TagEntry evicted = tagentry.value;
+      
       // insert into eaf it its not an unused prefetch
       if (_reusePrediction) {
-        if (tagentry.value.prefState != PREFETCHED_UNUSED)
+        if (evicted.prefState != PREFETCHED_UNUSED)
           _eaf.insert(tagentry.key);
       }
-      
+
+      if (evicted.prefState != NOT_PREFETCHED) {
+        INCREMENT(evicted_pref);
+      }
+
+      uint32 evicted_index = _tags.index(tagentry.key);
+
+      uint64 pref_lifetime_miss = 0;
+      uint64 pref_lifetime_cycle = 0;
+
       // check prefetched state
-      switch (tagentry.value.prefState) {
+      switch (evicted.prefState) {
       case PREFETCHED_UNUSED:
         INCREMENT(unused_prefetches);
-        ADD_TO_COUNTER(prefetch_lifetime_cycle,
-                       request -> currentCycle - tagentry.value.prefetchCycle);
-        ADD_TO_COUNTER(prefetch_lifetime_miss,
-                       _missCounter[index] - tagentry.value.prefetchMiss);
+        INCREMENT(evicted_unused_pref);
+        if (evicted.fakeDemoted) {
+          INCREMENT(evicted_unused_pref_faked);
+          pref_lifetime_cycle = evicted.useCycle - evicted.prefetchCycle;
+          pref_lifetime_miss = evicted.useMiss - evicted.prefetchMiss + 1;
+        }
+        else {
+          pref_lifetime_cycle = request -> currentCycle - evicted.prefetchCycle;
+          pref_lifetime_miss = _missCounter[evicted_index] - evicted.prefetchMiss;
+        }
 
         // if accuracy prediction is enabled, update the accuracy table
         if (_accuracyPrediction) {
@@ -638,17 +711,21 @@ protected:
         
       case PREFETCHED_USED:
         INCREMENT(unreused_prefetches);
-        ADD_TO_COUNTER(prefetch_lifetime_cycle,
-                       request -> currentCycle - tagentry.value.prefetchCycle);
-        ADD_TO_COUNTER(prefetch_lifetime_miss,
-                       _missCounter[index] - tagentry.value.prefetchMiss);
+        INCREMENT(evicted_usedonce_pref);
+        if (tagentry.value.dcpDemoted) {
+          pref_lifetime_cycle = evicted.useCycle - evicted.prefetchCycle;
+          pref_lifetime_miss = evicted.useMiss - evicted.prefetchMiss + 1;
+        }
+        else {
+          pref_lifetime_cycle = request -> currentCycle - evicted.prefetchCycle;
+          pref_lifetime_miss = _missCounter[evicted_index] - evicted.prefetchMiss;
+        }
         break;
         
       case PREFETCHED_REUSED:
-        ADD_TO_COUNTER(prefetch_lifetime_cycle,
-                       tagentry.value.useCycle - tagentry.value.prefetchCycle);
-        ADD_TO_COUNTER(prefetch_lifetime_miss,
-                       tagentry.value.useMiss - tagentry.value.prefetchMiss);
+        INCREMENT(evicted_reused_pref);
+        pref_lifetime_cycle = evicted.useCycle - evicted.prefetchCycle;
+        pref_lifetime_miss = evicted.useMiss - evicted.prefetchMiss + 1;
         break;
         
       case NOT_PREFETCHED:
@@ -656,6 +733,15 @@ protected:
         break;
       }
 
+      ADD_TO_COUNTER(prefetch_lifetime_miss, pref_lifetime_miss);
+      ADD_TO_COUNTER(prefetch_lifetime_cycle, pref_lifetime_cycle);
+
+
+      if (!tagentry.value.lowPriority && !tagentry.value.fakeDemoted
+          && !tagentry.value.dcpDemoted) {
+        _missCounter[evicted_index] ++;
+      }
+      
       if (tagentry.value.dirty) {
         INCREMENT(dirty_evictions);
         MemoryRequest *writeback =

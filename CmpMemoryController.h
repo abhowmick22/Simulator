@@ -127,6 +127,7 @@ public:
       CMP_PARAMETER_UINT("row-hit-latency", _rowHitLatency)
       CMP_PARAMETER_UINT("row-conflict-latency", _rowConflictLatency)
       CMP_PARAMETER_UINT("read-to-write-latency", _readToWriteLatency)
+      CMP_PARAMETER_UINT("write-to-read-latency", _readToWriteLatency)
         
       CMP_PARAMETER_UINT("channel-delay", _channelDelay)
       CMP_PARAMETER_UINT("bus-processor-ratio", _busProcessorRatio)

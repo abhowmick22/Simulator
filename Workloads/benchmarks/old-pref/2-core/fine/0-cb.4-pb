@@ -1,0 +1,15 @@
+GemsFDTD-libquantum
+bwaves-lbm
+lbm-lucas
+libquantum-lucas
+bwaves-bwaves
+lbm-libquantum
+lucas-lucas
+GemsFDTD-bwaves
+bwaves-libquantum
+libquantum-libquantum
+GemsFDTD-lucas
+bwaves-lucas
+lbm-lbm
+GemsFDTD-lbm
+GemsFDTD-GemsFDTD

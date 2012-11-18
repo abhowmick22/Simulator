@@ -1,0 +1,14 @@
+gromacs-wupwise
+gcc-h264ref
+omnetpp-zeusmp
+cactusADM-zeusmp
+fma3d-gcc
+gcc-xalancbmk
+omnetpp-wupwise
+astar-wupwise
+milc-xalancbmk
+h264ref-milc
+gromacs-zeusmp
+fma3d-milc
+astar-zeusmp
+cactusADM-wupwise

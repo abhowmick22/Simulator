@@ -272,6 +272,7 @@ class OoOTraceSimulator {
                       _procs[cpuID].finishIcount = _procs[cpuID].currentIcount;
                       _procs[cpuID].finishCycle = _procs[cpuID].currentCycle;
                       finished.set(cpuID);
+                      _simulator.EndProcSimulation(cpuID);
                       fprintf(_ipcFile, "%u %llu %llu\n", cpuID, 
                           _procs[cpuID].currentIcount - 
                           _procs[cpuID].checkpointIcount,

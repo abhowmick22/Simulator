@@ -39,6 +39,7 @@ struct MemoryRequest {
   enum Type {
     READ,
     READ_FOR_WRITE,
+    FAKE_READ,
     WRITE,
     PARTIALWRITE,
     WRITEBACK,
