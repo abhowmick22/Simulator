@@ -1,11 +1,11 @@
 // -----------------------------------------------------------------------------
-// File: CmpFDPAP.h
+// File: CmpFDP.h
 // Description:
 //    Implements a last-level cache with prefetch monitors
 // -----------------------------------------------------------------------------
 
-#ifndef __CMP_FDP_AP_H__
-#define __CMP_FDP_AP_H__
+#ifndef __CMP_FDP_H__
+#define __CMP_FDP_H__
 
 // -----------------------------------------------------------------------------
 // Module includes
@@ -15,18 +15,19 @@
 #include "Types.h"
 #include "GenericTagStore.h"
 
+
 // -----------------------------------------------------------------------------
 // Standard includes
 // -----------------------------------------------------------------------------
 
 
 // -----------------------------------------------------------------------------
-// Class: CmpFDPAP
+// Class: CmpFDP
 // Description:
 //    Baseline lastlevel cache.
 // -----------------------------------------------------------------------------
 
-class CmpFDPAP : public MemoryComponent {
+class CmpFDP : public MemoryComponent {
 
 protected:
 
@@ -87,16 +88,13 @@ protected:
   uint32 _numBlocks;
   generic_tagstore_t <addr_t, TagEntry> _tags;
   policy_value_t _pval;
+  policy_value_t _prefPval;
 
-  struct AccuracyEntry {
-    uint64 avg_prefetches;
-    uint64 avg_used;
-    uint64 cur_prefetches;
-    uint64 cur_used;
-    generic_tagstore_t <addr_t, bool> ipEAF;
-  };
-
-  vector <AccuracyEntry> _accuracyTable;
+  uint64 _curMisses;
+  uint64 _avgMisses;
+  uint64 _curPrefMisses;
+  uint64 _avgPrefMisses;
+  generic_tagstore_t <addr_t, bool> _prefEvicted;
   
   vector <uint32> _missCounter;
   vector <uint64> _procMisses;
@@ -137,7 +135,7 @@ public:
   // Constructor. It cannot take any arguments
   // -------------------------------------------------------------------------
 
-  CmpFDPAP() {
+  CmpFDP() {
     _size = 1024;
     _blockSize = 64;
     _associativity = 16;
@@ -223,14 +221,12 @@ public:
     _missCounter.resize(_numSets, 0);
     _procMisses.resize(_numCPUs, 0);
 
-    _accuracyTable.resize(_accuracyTableSize);
-    for (uint32 i = 0; i < _accuracyTableSize; i ++) {
-      _accuracyTable[i].avg_prefetches = 0;
-      _accuracyTable[i].avg_used = 0;
-      _accuracyTable[i].cur_prefetches = 0;
-      _accuracyTable[i].cur_used = 0;
-      _accuracyTable[i].ipEAF.SetTagStoreParameters(_prefetchDistance, 1, "fifo");
-    }
+    _curMisses = 0;
+    _avgMisses = 0;
+    _curPrefMisses = 0;
+    _avgPrefMisses = 0;
+    _prefEvicted.SetTagStoreParameters(_numSets, _associativity, _policy);
+    _prefPval = POLICY_HIGH;
 
     switch (_policyVal) {
     case 0: _pval = POLICY_HIGH; break;
@@ -320,7 +316,6 @@ protected:
           ADD_TO_COUNTER(prefetch_use_miss,
                          tagentry.useMiss - tagentry.prefetchMiss);
 
-          _accuracyTable[tagentry.prefID].cur_used ++;
           if (tagentry.lowPriority) {
             tagentry.lowPriority = false;
             INCREMENT(accurate_predicted_inaccurate);
@@ -345,13 +340,6 @@ protected:
         _missCounter[index] ++;
         _procMisses[request -> cpuID] ++;
 
-        if (request -> d_prefetched) {
-          AccuracyEntry &accEntry = _accuracyTable[request -> d_prefID];
-          if (accEntry.ipEAF.lookup(ctag)) {
-            accEntry.ipEAF.invalidate(ctag);
-            INCREMENT(accurate_predicted_inaccurate);
-          }
-        }
       }
           
       return _tagStoreLatency;
@@ -360,8 +348,6 @@ protected:
 
       INCREMENT(prefetches);
 
-      _accuracyTable[request -> prefetcherID].cur_prefetches ++;
-      
       if (_tags.lookup(ctag)) {
         request -> serviced = true;
         request -> AddLatency(_tagStoreLatency + _dataStoreLatency);
@@ -429,19 +415,26 @@ protected:
 
     table_t <addr_t, TagEntry>::entry tagentry;
 
+    // update misses
+    if (request -> type != MemoryRequest::WRITEBACK) {
+      _curMisses ++;
+    }
+    
+    // check pollution filter
+    if (_prefEvicted.lookup(ctag)) {
+      if (request -> type == MemoryRequest::PREFETCH) {
+        _prefEvicted.invalidate(ctag);
+      }
+      else if (request -> type != MemoryRequest::WRITEBACK) {
+        _prefEvicted.invalidate(ctag);
+        _curPrefMisses ++;
+      }
+    }
+    
     policy_value_t priority = _pval;
 
     if (request -> type == MemoryRequest::PREFETCH) {
-      AccuracyEntry accEntry = _accuracyTable[request -> prefetcherID];
-      uint64 total = (accEntry.avg_prefetches + accEntry.cur_prefetches) / 2;
-      uint64 used = (accEntry.avg_used + accEntry.cur_used) / 2;
-      if (used * 2 > total) {
-        priority = POLICY_HIGH;
-        INCREMENT(predicted_accurate);
-      }
-      else {
-        priority = POLICY_LOW;
-      }
+      priority = _prefPval;
     }
     
     // insert the block into the cache
@@ -467,16 +460,23 @@ protected:
     if (tagentry.valid) {
       INCREMENT(evictions);
 
+      if (tagentry.value.prefState == NOT_PREFETCHED && request -> type == MemoryRequest::PREFETCH) {
+        _prefEvicted.insert(tagentry.key, true);
+      }
+      
       if ((evictions % (_numBlocks / 2)) == 0) {
-        for (uint32 i = 0; i < _accuracyTableSize; i ++) {
-          AccuracyEntry &accEntry = _accuracyTable[i];
-          uint64 total = (accEntry.avg_prefetches + accEntry.cur_prefetches) / 2;
-          uint64 used = (accEntry.avg_used + accEntry.cur_used) / 2;
-          accEntry.avg_prefetches = total;
-          accEntry.avg_used = used;
-          accEntry.cur_prefetches = 0;
-          accEntry.cur_used = 0;
+        uint64 totalMisses = (_curMisses + _avgMisses) / 2;
+        uint64 prefMisses = (_curPrefMisses + _avgPrefMisses) / 2;
+        if (prefMisses * 4 > totalMisses) {
+          _prefPval = POLICY_LOW;
         }
+        else {
+          _prefPval = POLICY_HIGH;
+        }
+        _avgMisses = totalMisses;
+        _avgPrefMisses = prefMisses;
+        _curMisses = 0;
+        _curPrefMisses = 0;
       }
 
       // check prefetched state
@@ -488,12 +488,6 @@ protected:
         ADD_TO_COUNTER(prefetch_lifetime_miss,
                        _missCounter[index] - tagentry.value.prefetchMiss);
 
-        if (tagentry.value.lowPriority) {
-          _accuracyTable[tagentry.value.prefID].ipEAF.insert(tagentry.key, true);
-        }
-        else {
-          INCREMENT(inaccurate_predicted_accurate);
-        }
         break;
         
       case PREFETCHED_USED:
@@ -531,4 +525,4 @@ protected:
   }
 };
 
-#endif // __CMP_FDP_AP_H__
+#endif // __CMP_FDP_H__
