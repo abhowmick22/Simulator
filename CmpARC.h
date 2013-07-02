@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // File: CmpARC.h
 // Description:
-//
+//    Implements the Adaptive Replacement Cache.
 // -----------------------------------------------------------------------------
 
 #ifndef __CMP_ARC_H__
@@ -23,8 +23,8 @@
 #include <algorithm>
 
 // definitions
-#define FOR_EACH(iter,setindex,lname) \
-  for (list <TagEntry>::iterator iter = _sets[setindex].lname.begin(); \
+#define FOR_EACH(iter,setindex,lname)                                   \
+  for (list <TagEntry>::iterator iter = _sets[setindex].lname.begin();  \
        iter != _sets[setindex].lname.end(); iter ++)
 
 // -----------------------------------------------------------------------------
@@ -35,7 +35,7 @@
 
 class CmpARC : public MemoryComponent {
 
- protected:
+protected:
 
   // -------------------------------------------------------------------------
   // Parameters
@@ -99,7 +99,7 @@ class CmpARC : public MemoryComponent {
 
   
 
- public:
+public:
 
   // -------------------------------------------------------------------------
   // Constructor. It cannot take any arguments
@@ -186,7 +186,7 @@ class CmpARC : public MemoryComponent {
   }
 
 
- protected:
+protected:
 
   // -------------------------------------------------------------------------
   // Function to process a request. Return value indicates number of busy
@@ -210,8 +210,10 @@ class CmpARC : public MemoryComponent {
     // check if its a read or write back
     switch (request -> type) {
 
-    // READ request
-    case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH:
+      // READ request
+    case MemoryRequest::READ:
+    case MemoryRequest::READ_FOR_WRITE:
+    case MemoryRequest::PREFETCH:
 
       INCREMENT(reads);
 
@@ -230,7 +232,7 @@ class CmpARC : public MemoryComponent {
       return _tagStoreLatency;
 
       
-    // WRITEBACK request
+      // WRITEBACK request
     case MemoryRequest::WRITEBACK:
 
       INCREMENT(writebacks);

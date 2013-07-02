@@ -30,7 +30,7 @@
 
 using namespace std;
 
-#define COMPONENTS_FOLDER "Simulator/Components/"
+#define COMPONENTS_FOLDER "/home/abhishek/Cache-sim/Simulator/Components/"
 
 // -----------------------------------------------------------------------------
 // Functions and macros to add a new component to the component list and create
@@ -49,9 +49,10 @@ using namespace std;
   return cmp;
 
 #define COMPONENT(name,classname) \
-  else if (type.compare(name) == 0) {\
+  else if (type.compare(name) == 0) {\	
     cmp = new classname;\
-  }
+  }    
+
 
 
 // -----------------------------------------------------------------------------
@@ -198,6 +199,8 @@ using namespace std;
 typedef priority_queue <MemoryRequest *, vector <MemoryRequest *>,
           MemoryRequest::ComparePointers> RequestPriorityQueue;
 
+// priority_queue is a pre-existing type, present in the std namespace
+
 // -----------------------------------------------------------------------------
 // Class: MemoryComponent
 // Description:
@@ -305,6 +308,8 @@ class MemoryComponent {
     // Function to set back pointers for the simulator time and hierarchy
     // -------------------------------------------------------------------------
 
+// This function sets the simulator cycle and hierarchy pointers to the global simcycle and hierarchy 
+
     void SetBackPointers(vector <vector <MemoryComponent *> > *hier,
         cycles_t *simCycle) {
       // set the pointers for the simulator cycle and hierarchy
@@ -399,7 +404,7 @@ class MemoryComponent {
       _done.set(cpuID);
     }
 
- 
+
 
 
     // -------------------------------------------------------------------------
@@ -431,12 +436,18 @@ class MemoryComponent {
       // get the request on the top of the queue
       MemoryRequest *request = _queue.top();
 
-      // process till component reaches simulator cycles
+/*
+Process till the currentcycle of request reaches global simulator cycles
+and do this for all the request that are in the queue. 
+Access the request according to age. 
+*/
+      // process till component (or request ??) reaches simulator cycles
       while (request -> currentCycle <= (*_simulatorCycle)) {
         
         _queue.pop();
 
-        // if component is past the simulator
+        // if component is past the simulator (When can this scenario arise?)
+	// this if block ensures that request is in sync with whichever component it arrives at 
         if (_currentCycle > (*_simulatorCycle)) {
           request -> currentCycle = _currentCycle;
           _queue.push(request);
@@ -454,6 +465,7 @@ class MemoryComponent {
             _currentCycle += busyCycles;
             SendToNextComponent(request);
           }
+	// request is yet to be serviced
           else {
             request -> currentCycle = now;
             cycles_t busyCycles = ProcessRequest(request);
@@ -508,7 +520,7 @@ class MemoryComponent {
 
       // if the request is stalling, set its current cycle to 
       // one past the component's currenct cycle (ensure progress)
-      // add it back to the component's queue.
+      // add it back to the component's queue. (This doesn't seem to have been done)
       if (request -> stalling) {
         return;
       }
@@ -524,6 +536,7 @@ class MemoryComponent {
 
       // else if request is not serviced send it to next component
       else {
+	// check if request has reached end of component hierarchy
         if ((uint32)(request -> cmpID + 1) == ((*_hier)[request -> cpuID]).size())
           request -> serviced = true;
         else

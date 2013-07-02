@@ -194,6 +194,8 @@ public:
 };
 
 
+// All the functions till here were just functions of the table class
+
 // -----------------------------------------------------------------------------
 // Macros for including more policies
 // -----------------------------------------------------------------------------

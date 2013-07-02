@@ -4,6 +4,13 @@
 //    Implements a last-level cache
 // -----------------------------------------------------------------------------
 
+/*
+It is the job of LLC to generate writebacks with good row buffer locality that are to be sent to the
+memory controller so that it can make use of this locality to avoid turnaround time in the channel (aggressive write back)
+Right now, we assume that  the memory controller does this correctly, if it does not, we will have to look into 
+behaviour of memory controller
+*/
+
 #ifndef __CMP_LLC_H__
 #define __CMP_LLC_H__
 
@@ -114,8 +121,8 @@ public:
       CMP_PARAMETER_UINT("tag-store-latency", _tagStoreLatency)
       CMP_PARAMETER_UINT("data-store-latency", _dataStoreLatency)
 
-      CMP_PARAMETER_END
-      }
+    CMP_PARAMETER_END
+  }
 
 
   // -------------------------------------------------------------------------
@@ -124,13 +131,13 @@ public:
 
   void InitializeStatistics() {
 
-    INITIALIZE_COUNTER(accesses, "Total Accesses")
-      INITIALIZE_COUNTER(reads, "Read Accesses")
-      INITIALIZE_COUNTER(writebacks, "Writeback Accesses")
-      INITIALIZE_COUNTER(misses, "Total Misses")
-      INITIALIZE_COUNTER(evictions, "Evictions")
-      INITIALIZE_COUNTER(dirty_evictions, "Dirty Evictions")
-      }
+    INITIALIZE_COUNTER(accesses, "Total Accesses");
+    INITIALIZE_COUNTER(reads, "Read Accesses");
+    INITIALIZE_COUNTER(writebacks, "Writeback Accesses");
+    INITIALIZE_COUNTER(misses, "Total Misses");
+    INITIALIZE_COUNTER(evictions, "Evictions");
+    INITIALIZE_COUNTER(dirty_evictions, "Dirty Evictions");
+  }
 
 
   // -------------------------------------------------------------------------
@@ -170,6 +177,7 @@ protected:
   // cycles for the component.
   // -------------------------------------------------------------------------
 
+
   cycles_t ProcessRequest(MemoryRequest *request) {
 
     // update stats
@@ -192,7 +200,9 @@ protected:
     switch (request -> type) {
 
       // READ request
-    case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH:
+    case MemoryRequest::READ:
+    case MemoryRequest::READ_FOR_WRITE:
+    case MemoryRequest::PREFETCH:
 
       INCREMENT(reads);
           

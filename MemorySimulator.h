@@ -123,6 +123,8 @@ class MemorySimulator {
 
     void AdvanceSimulation(cycles_t now) {
       // update current time of the simulator
+      // Who gives this updated time to simulator ? look for this function
+	// This is done by the AutoAdvance function
       if (now > _currentCycle)
         _currentCycle = now;
 
@@ -132,6 +134,7 @@ class MemorySimulator {
         (*cmp) -> ProcessPendingRequests();
       }
     }
+
 
 
     // -------------------------------------------------------------------------
@@ -150,6 +153,7 @@ class MemorySimulator {
       list <MemoryComponent *>::iterator cmp;
       for (cmp = _components.begin(); cmp != _components.end(); cmp ++) {
         request = (*cmp) -> EarliestRequest();
+	// EarliestRequest just returns the top of the queue
         if (request != NULL) {
           if (!flag) {
             flag = true;
@@ -208,7 +212,7 @@ class MemorySimulator {
 
 
     // -------------------------------------------------------------------------
-    // Current cycle
+    // Return current cycle
     // -------------------------------------------------------------------------
 
     cycles_t CurrentCycle() {
@@ -217,7 +221,7 @@ class MemorySimulator {
 
 
     // -------------------------------------------------------------------------
-    // Function to handle heart beat
+    // Function to handle heart beats of all components
     // -------------------------------------------------------------------------
 
     void HeartBeat(cycles_t hbCount) {
@@ -232,6 +236,9 @@ class MemorySimulator {
     // parameters of the request and sends it to the first component of the cpu
     // hierarchy.
     // -------------------------------------------------------------------------
+
+	// ProcessMemoryRequest sends request to first memory component, while ProcessRequest handles requests
+	// to later memory components
 
     void ProcessMemoryRequest(MemoryRequest *request) {
 
@@ -352,11 +359,12 @@ class MemorySimulator {
             (string)fname;
           FILE *cmpfile = fopen(cmpfilename.c_str(), "r");
           if (cmpfile == NULL) {
+            //fprintf(stderr, "[ABHISHEK] : the type is %s blah blah\n", cmptype[name].c_str());
             fprintf(stderr, "Error: Component file `%s' not found\n",
                 cmpfilename.c_str());
             exit(0);
           }
-
+	  //fprintf(stderr, "[ABHISHEK] : When file exists, the type is %s blah blah and the file is %s\n", cmptype[name].c_str(),cmpfilename.c_str());
           char fieldline[300];
           while (fgets(fieldline, 300, cmpfile)) {
             sscanf(fieldline, "%s %s", field, value);

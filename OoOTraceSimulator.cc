@@ -2,7 +2,7 @@
 // File: OoOTraceSimulator.cc
 // Description:
 //    This file defines the trace based simulator. Traces can be generated
-//    throught the trace module for simics.
+//    through the trace module for simics.
 // -----------------------------------------------------------------------------
 
 

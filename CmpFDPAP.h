@@ -320,11 +320,12 @@ protected:
           ADD_TO_COUNTER(prefetch_use_miss,
                          tagentry.useMiss - tagentry.prefetchMiss);
 
-          _accuracyTable[tagentry.prefID].cur_used ++;
           if (tagentry.lowPriority) {
             tagentry.lowPriority = false;
             INCREMENT(accurate_predicted_inaccurate);
           }
+          _accuracyTable[tagentry.prefID].cur_used ++;
+            
           break;
           
         case PREFETCHED_USED:
@@ -342,7 +343,7 @@ protected:
       else {
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
+        //        _missCounter[index] ++;
         _procMisses[request -> cpuID] ++;
 
         if (request -> d_prefetched) {
@@ -372,7 +373,7 @@ protected:
       else {
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
+        //        _missCounter[index] ++;
       }
           
       return _tagStoreLatency;
@@ -514,6 +515,10 @@ protected:
       case NOT_PREFETCHED:
         // do nothing
         break;
+      }
+
+      if (!tagentry.value.lowPriority) {
+        _missCounter[index] ++;
       }
 
       if (tagentry.value.dirty) {

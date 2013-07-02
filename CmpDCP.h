@@ -54,6 +54,7 @@ protected:
   bool _reusePrediction;
   bool _demandReusePrediction;
   bool _accuracyPrediction;
+  bool _perEntryAcc;
   bool _noDCP;
   bool _drop;
   bool _useAccuracyPrefetchHit;
@@ -62,6 +63,7 @@ protected:
   uint32 _accuracyTableSize; // same as the prefetch table size
   uint32 _prefetchDistance;
   uint32 _accuracyCounterMax;
+  
 
   // -------------------------------------------------------------------------
   // Private members
@@ -192,8 +194,9 @@ public:
     _reusePrediction = false;
     _demandReusePrediction = false;
     _accuracyPrediction = false;
-    _accuracyTableSize = 16;
-    _prefetchDistance = 24;
+    _accuracyTableSize = 128;
+    _prefetchDistance = 64;
+    _perEntryAcc = true;
     _accuracyCounterMax = 16;
     _pselThreshold = 1024;
     _noDCP = false;
@@ -228,6 +231,7 @@ public:
       CMP_PARAMETER_BOOLEAN("demand-reuse-prediction", _demandReusePrediction)
       CMP_PARAMETER_BOOLEAN("accuracy-prediction", _accuracyPrediction)
       CMP_PARAMETER_BOOLEAN("drop", _drop)
+      CMP_PARAMETER_BOOLEAN("per-entry-acc", _perEntryAcc)
       CMP_PARAMETER_BOOLEAN("no-dcp", _noDCP)
       CMP_PARAMETER_BOOLEAN("use-accuracy-prefetch-hit", _useAccuracyPrefetchHit)
       CMP_PARAMETER_BOOLEAN("handle-fake", _handleFake)
@@ -411,7 +415,8 @@ protected:
 
           // update accuracy
           if (_accuracyPrediction) {
-            _accuracyTable[tagentry.prefID].counter.increment();
+            uint32 prefID = _perEntryAcc ? tagentry.prefID : 0;
+            _accuracyTable[prefID].counter.increment();
             if (tagentry.lowPriority) {
               tagentry.lowPriority = false;
               INCREMENT(accurate_predicted_inaccurate);
@@ -477,7 +482,8 @@ protected:
         // check ipEAF if necessary
         if (_accuracyPrediction) {
           if (request -> d_prefetched) {
-            AccuracyEntry &accEntry = _accuracyTable[request -> d_prefID];
+            uint32 prefID = _perEntryAcc ? request -> d_prefID : 0;
+            AccuracyEntry &accEntry = _accuracyTable[prefID];
             if (accEntry.ipEAF.lookup(ctag)) {
               accEntry.ipEAF.invalidate(ctag);
               accEntry.counter.increment();
@@ -524,7 +530,8 @@ protected:
         // if accuracy predictor should be used on prefetch hits
         if (_accuracyPrediction && _useAccuracyPrefetchHit) {
           // promote if accurate prefetch
-          AccuracyEntry &accEntry = _accuracyTable[request -> prefetcherID];
+          uint32 prefID = _perEntryAcc ? request -> prefetcherID : 0;
+          AccuracyEntry &accEntry = _accuracyTable[prefID];
           if (accEntry.counter > (_accuracyCounterMax / 2)) {
             _tags.read(ctag, POLICY_HIGH);
             INCREMENT(predicted_accurate);
@@ -539,7 +546,8 @@ protected:
       }
       else { 
         if (_accuracyPrediction && _drop) {
-          AccuracyEntry &accEntry = _accuracyTable[request -> prefetcherID];
+          uint32 prefID = _perEntryAcc ? request -> prefetcherID : 0;
+          AccuracyEntry &accEntry = _accuracyTable[prefID];
           if (accEntry.counter <= (_accuracyCounterMax / 2)) {
             request -> serviced = true;
             if (accEntry.ipEAF.insert(ctag, true).valid)
@@ -626,7 +634,8 @@ protected:
     // if there is accuracy prediction
     if (_accuracyPrediction &&
         request -> type == MemoryRequest::PREFETCH) {
-      if (_accuracyTable[request -> prefetcherID].counter >
+      uint32 prefID = _perEntryAcc ? request -> prefetcherID : 0;
+      if (_accuracyTable[prefID].counter >
           (_accuracyCounterMax / 2)) {
         priority = POLICY_HIGH;
         INCREMENT(predicted_accurate);
@@ -696,7 +705,8 @@ protected:
 
         // if accuracy prediction is enabled, update the accuracy table
         if (_accuracyPrediction) {
-          AccuracyEntry &accEntry = _accuracyTable[tagentry.value.prefID];
+          uint32 prefID = _perEntryAcc ? tagentry.value.prefID : 0;
+          AccuracyEntry &accEntry = _accuracyTable[prefID];
           if (tagentry.value.lowPriority) {
             if (accEntry.ipEAF.insert(tagentry.key, true).valid)
               accEntry.counter.decrement();

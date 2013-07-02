@@ -2,7 +2,7 @@
 
 # ------------------------------------------------------------------------------
 # This script runs the memory simulator with multi programmed workloads. The
-# workloads are specified through a workload file. The number of processors in
+# workloads are specified through a workload file. The number of processors are
 # inferred from the workload file. So, it can be used to run single programmed
 # workloads also.
 # ------------------------------------------------------------------------------
@@ -23,14 +23,17 @@ import re
 # Some global parameters
 # ------------------------------------------------------------------------------
 
-MOD_FOLDER = "Simulator/"
+MOD_FOLDER = "/home/abhishek/Cache-sim/Simulator/"
 DEF_FOLDER = MOD_FOLDER + "Definitions/"
 SIM_BINARY= MOD_FOLDER + "bin/OoOTraceSimulator"
 SIM_DEBUG_BINARY = MOD_FOLDER + "bin/Debug.OoOTraceSimulator"
 WORKLOAD_FOLDER = MOD_FOLDER + "Workloads/"
-SHARED_TRACE_FOLDER = "/net/dartgun/export/vseshadr/work/traces"
-LOCAL_TRACE_FOLDER = "/scratch/vseshadr/traces"
-CONDOR_BASE_FOLDER = "/net/africanswallow/export/vseshadr/work/"
+#SHARED_TRACE_FOLDER = "/net/dartgun/export/vseshadr/work/traces"
+SHARED_TRACE_FOLDER = MOD_FOLDER
+#LOCAL_TRACE_FOLDER = "/scratch/vseshadr/traces"
+LOCAL_TRACE_FOLDER = MOD_FOLDER + "traces"
+#CONDOR_BASE_FOLDER = "/net/africanswallow/export/vseshadr/work/"
+CONDOR_BASE_FOLDER = MOD_FOLDER
 
 
 # ------------------------------------------------------------------------------
@@ -109,7 +112,7 @@ if args.workload_file is not None:
         print "Error: Specified workload file does not exist"
         quit()
 
-
+#make some changes here
 # ------------------------------------------------------------------------------
 # Check if the trace selector is present or can be infered
 # ------------------------------------------------------------------------------

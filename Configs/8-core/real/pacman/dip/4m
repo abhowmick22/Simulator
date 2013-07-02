@@ -1,0 +1,27 @@
+l1-mshr-1 32-64b
+l2-1 256k64b8wayLRU
+l2-mshr-1 32-64b
+l1-mshr-2 32-64b
+l2-2 256k64b8wayLRU
+l2-mshr-2 32-64b
+l1-mshr-3 32-64b
+l2-3 256k64b8wayLRU
+l2-mshr-3 32-64b
+l1-mshr-4 32-64b
+l2-4 256k64b8wayLRU
+l2-mshr-4 32-64b
+l1-mshr-5 32-64b
+l2-5 256k64b8wayLRU
+l2-mshr-5 32-64b
+l1-mshr-6 32-64b
+l2-6 256k64b8wayLRU
+l2-mshr-6 32-64b
+l1-mshr-7 32-64b
+l2-7 256k64b8wayLRU
+l2-mshr-7 32-64b
+l1-mshr-8 32-64b
+l2-8 256k64b8wayLRU
+l2-mshr-8 32-64b
+llc dip/4m
+llc-mshr inf-64b
+override mc stall-count 300

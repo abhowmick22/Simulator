@@ -5,6 +5,9 @@
 //    a simple remainder. Will think aboug generalizing it later.
 // -----------------------------------------------------------------------------
 
+
+// open-hash table is that which maintains a linked list of entries that have hash collisions
+
 #ifndef __GENERIC_TAG_STORE_H__
 #define __GENERIC_TAG_STORE_H__
 
@@ -26,6 +29,9 @@
 //    Implements a bounded hash table
 // -----------------------------------------------------------------------------
 
+// generic tagstore is an array of generic tables
+// each generic table corresponds to one set
+
 template <class key_t, class value_t>
 class generic_tagstore_t {
 
@@ -35,16 +41,16 @@ protected:
   // Parameters
   // -------------------------------------------------------------------------
     
-  uint32 _numSets;
-  uint32 _numSlotsPerSet;
-  string _policy;
+  uint32 _numSets;				// nbr of sets in the cache, determined by cache index
+  uint32 _numSlotsPerSet;			// nbr of ways
+  string _policy;				// replacement policy
 
 
   // -------------------------------------------------------------------------
   // Private members
   // -------------------------------------------------------------------------
 
-  generic_table_t <key_t, value_t> *_sets;
+  generic_table_t <key_t, value_t> *_sets;	// generic table is a flexible wrapper for table incorporating policies
 
 
 public:
@@ -84,13 +90,14 @@ public:
 
     // set the table values
     _sets = new generic_table_t <key_t, value_t> [_numSets];
+
     for (uint32 i = 0; i < _numSets; i ++)
       _sets[i].SetTableParameters(_numSlotsPerSet, _policy);
   }
 
 
   // -------------------------------------------------------------------------
-  // Function to compute the index of a set
+  // Function to compute the index of a set, a hash function
   // -------------------------------------------------------------------------
 
   uint32 index(key_t key) {

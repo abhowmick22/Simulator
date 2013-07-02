@@ -38,11 +38,11 @@ struct MemoryRequest {
   // request type
   enum Type {
     READ,
-    READ_FOR_WRITE,
-    FAKE_READ,
     WRITE,
     PARTIALWRITE,
     WRITEBACK,
+    READ_FOR_WRITE,
+    FAKE_READ,
     PREFETCH
   } type;
   // instruction pointer
@@ -151,6 +151,7 @@ struct MemoryRequest {
   // Comparison class for memory request pointers
   // ---------------------------------------------------------------------------
 
+// returns True if the first object is older than second one
   struct ComparePointers {
     bool operator() (const MemoryRequest *a, const MemoryRequest *b) const {
       return (a -> currentCycle) > (b -> currentCycle);
@@ -163,6 +164,7 @@ struct MemoryRequest {
 // Some macros
 // -----------------------------------------------------------------------------
 
+// VADDR is the address of the data while VBLOCK_ADDRESS is the address of the block containing the data 
 #define PADDR(request) ((request) -> physicalAddress)
 #define VADDR(request) ((request) -> virtualAddress)
 

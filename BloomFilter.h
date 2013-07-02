@@ -29,6 +29,8 @@
 using namespace std;
 
 #define RAND_SEED 29346
+#define MAX_BITS 262144
+
 
 // -----------------------------------------------------------------------------
 // Class: bloom_filter_t
@@ -52,7 +54,7 @@ protected:
   // Private structures
   // ---------------------------------------------------------------------------
 
-  bitset <262144> _filter;
+  bitset <MAX_BITS> _filter;
   vector <uint64> _hashOdds;
   uint32 _logSize;
   uint32 _maxBitPosition;
@@ -74,7 +76,7 @@ protected:
   uint64 _tests;
 
   
- public:
+public:
 
   // ---------------------------------------------------------------------------
   // Constructor
@@ -229,6 +231,7 @@ protected:
   
 
 };
+
 
 
 class h3_bloom_filter_t : public bloom_filter_t {

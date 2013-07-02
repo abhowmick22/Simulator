@@ -1,0 +1,20 @@
+When run using DBI , the sim ipc increase by 9% as compared to using llc-pref. 
+Variation in sim ipc between two runs of llc-pref is 0. There is no difference in either the sim ipc or the sim log.  
+
+The counters for llc:dirty_evictions and mc:writes increase drastically (49 to 2292757 for both) when going from llc-pref to llc-dbi
+
+With llc-pref, there are prefetch counters and a miss-0 counter (?)
+
+Probably we are not resetting the dirty bit once we have cleaned it. 
+
+
+When cleaning operation for the DBI is added to the CmpLLCDBI, 
+then the sim ipc and simlog are same with and without dbi
+
+
+
+
+
+
+We should compare against baselie LLC, that is, use a definition file which has component baseline-llc and not llc-pref
+One such definition is 

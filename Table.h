@@ -111,7 +111,7 @@ protected:
 
 
   // -------------------------------------------------------------------------
-  // Key index to speed up search
+  // map of Key index to speed up search
   // -------------------------------------------------------------------------
 
   map <key_t, uint32> _keyIndex;
@@ -145,9 +145,9 @@ protected:
   }
 
 
-  // -------------------------------------------------------------------------
-  // Function to search for a key
-  // -------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------
+  // Function to search for a key, basically returns the index if entry is valid
+  // ----------------------------------------------------------------------------
 
   uint32 SearchForKey(key_t key) {
     if (_indexIsKey) {
@@ -156,20 +156,20 @@ protected:
         return key;
     }
     else {
-      if (_keyIndex.find(key) != _keyIndex.end())
-        return _keyIndex[key];
+      if (_keyIndex.find(key) != _keyIndex.end())	// end is returned if key is not found
+        return _keyIndex[key];				// return the value (index) in the map
     }
     return _size;
   }
 
 
-  // -------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------
   // Function to insert an entry
   // -------------------------------------------------------------------------
     
   void InsertEntry(entry e) {
     if (!_indexIsKey)
-      _keyIndex.insert(make_pair(e.key, e.index));
+      _keyIndex.insert(make_pair(e.key, e.index));	// make_pair is a part of std namespace
     else 
       assert(e.key < _size && e.key >= 0);
     _table[e.index] = e;
@@ -180,6 +180,7 @@ protected:
   // Replace an entry
   // -------------------------------------------------------------------------
 
+	// replace e1 with e2
   void ReplaceEntry(entry e1, entry e2) {
     if (!_indexIsKey) {
       _keyIndex.erase(e1.key);
@@ -261,6 +262,12 @@ public:
   // Function to insert a key-value pair into the list
   // -------------------------------------------------------------------------
 
+
+/* this checks if key is already present -> return the corresponding entry
+   if not, then insert the entry directly if key is index -> return corr. entry
+           insert entry after getting index from freelist -> return corr. entry
+   if key is not present and table is full, then replace an entry with entry to be inserted -> return evicted entry
+*/
   virtual entry insert(key_t key, value_t value,
                        policy_value_t pval = POLICY_HIGH) {
     uint32 index;
@@ -272,7 +279,7 @@ public:
     // if index is key, then it should be free
     if (_indexIsKey) {
       index = key;
-      UpdateReplacementPolicy(index, T_INSERT, pval);
+      UpdateReplacementPolicy(index, T_INSERT, pval);			// why do we need it here?
       InsertEntry(entry(index, key, value));
       return entry(index);
     }
@@ -287,7 +294,7 @@ public:
     }
 
     // get a replacement index
-    index = GetReplacementIndex();
+    index = GetReplacementIndex();					// implemented by derived class
     UpdateReplacementPolicy(index, T_REPLACE, pval);
     entry evicted = _table[index];
     ReplaceEntry(evicted, entry(index, key, value));

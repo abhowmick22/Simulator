@@ -1,0 +1,38 @@
+component mshr l1-mshr-1
+component cache l2-1
+component mshr l2-mshr-1
+component mshr l1-mshr-2
+component cache l2-2
+component mshr l2-mshr-2
+component mshr l1-mshr-3
+component cache l2-3
+component mshr l2-mshr-3
+component mshr l1-mshr-4
+component cache l2-4
+component mshr l2-mshr-4
+component mshr l1-mshr-5
+component cache l2-5
+component mshr l2-mshr-5
+component mshr l1-mshr-6
+component cache l2-6
+component mshr l2-mshr-6
+component mshr l1-mshr-7
+component cache l2-7
+component mshr l2-mshr-7
+component mshr l1-mshr-8
+component cache l2-8
+component mshr l2-mshr-8
+component stream-prefetcher prefetcher
+component dcp llc
+component mshr llc-mshr
+component simple-mc mc
+
+0 l1-mshr-1 l2-1 l2-mshr-1
+1 l1-mshr-2 l2-2 l2-mshr-2
+2 l1-mshr-3 l2-3 l2-mshr-3
+3 l1-mshr-4 l2-4 l2-mshr-4
+4 l1-mshr-5 l2-5 l2-mshr-5
+5 l1-mshr-6 l2-6 l2-mshr-6
+6 l1-mshr-7 l2-7 l2-mshr-7
+7 l1-mshr-8 l2-8 l2-mshr-8
+all prefetcher llc llc-mshr mc

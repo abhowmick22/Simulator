@@ -8,7 +8,7 @@ ccount = int(sys.argv[2])
 pcount = cores - ccount
 count = int(sys.argv[3])
 
-with open('c-np') as f:
+with open('c') as f:
     clist = f.read().split()
 
 with open('nc-p') as f:

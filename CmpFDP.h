@@ -337,7 +337,7 @@ protected:
       else {
         INCREMENT(misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
+        //_missCounter[index] ++;
         _procMisses[request -> cpuID] ++;
 
       }
@@ -358,7 +358,7 @@ protected:
       else {
         INCREMENT(prefetch_misses);
         request -> AddLatency(_tagStoreLatency);
-        _missCounter[index] ++;
+        //_missCounter[index] ++;
       }
           
       return _tagStoreLatency;
@@ -509,6 +509,9 @@ protected:
         // do nothing
         break;
       }
+
+      if (!tagentry.value.lowPriority)
+        _missCounter[index] ++;
 
       if (tagentry.value.dirty) {
         INCREMENT(dirty_evictions);
