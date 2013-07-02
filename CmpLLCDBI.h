@@ -195,6 +195,8 @@ public:
 
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _dbi.SetTagStoreParameters(1, _numdbiEntries, _dbipolicy);
+
+    // check if table parameters are initialized
   
 
     switch (_policyVal) {
@@ -330,31 +332,80 @@ protected:
 
   // -------------------------------------------------------------------------
   // Function to insert a block into the cache
-  // Should define a handler (replacement policy) for the case when DBI is full 
+  // Should check for DBI evictions also
   // -------------------------------------------------------------------------
 
   void INSERT_BLOCK(addr_t ctag, bool dirty, MemoryRequest *request) {
 
     table_t <addr_t, TagEntry>::entry tagentry;
     table_t <addr_t, DBIEntry>::entry dbientry;
+    
+    bool evictedEntry;					// indicates if dbientry is evicted, true if evicted
 
-    addr_t logicalRow = ctag / BLOCKS_PER_ROW;
+    addr_t logicalRow = ctag / BLOCKS_PER_ROW;	
 
-    // insert the block into the cache
-    tagentry = _tags.insert(ctag, TagEntry(), _pval);
+    evictedEntry = !(_dbi.lookup(logicalRow));
+
+/*
+The following FSM has been implemented :
+1. First insert into _dbi.
+2. If returned dbientry was valid and evicted, generate writebacks for all the entries corresponding to dirty bits in the 
+   evicted dbientry. (nothing to be done when dbientry is valid and already present)
+3. Now insert into _tags. 
+4. If returned tagentry is valid and dirty (evicted or already present), then generate writebacks. 
+*/
+
+// if returned entry is due to free list in table, then bool valid will be false
+
+// How to differentiate between evicted and already present, use evictedEntry and lookup
+
+    
+// 1.
+    dbientry = _dbi.insert(logicalRow, DBIEntry(), _dbipval);
+    
+// 2. 
+    if(evictedEntry && dbientry.valid){
+    
+    // generate writebacks for all dirty blocks in the row
+      for(int i=0;i<BLOCKS_PER_ROW;i++){
+           
+          if(dbientry.value.dirtyBits[i]){     
+          ctag = (logicalRow * BLOCKS_PER_ROW) + i;
+
+          MemoryRequest *writeback =
+          new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                            MemoryRequest::WRITEBACK, request -> cmpID, 
+                            _tags[ctag].vcla, _tags[ctag].pcla, _blockSize,
+                            request -> currentCycle);  
+
+	 cout << "writeback generated due to DBI eviction\n";
+
+          writeback -> icount = request -> icount;
+          writeback -> ip = request -> ip;
+          SendToNextComponent(writeback);
+          }
+      }
+    }
+     
+  
+
+// 3. and 4.
+
+tagentry = _tags.insert(ctag, TagEntry(), _pval);
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
-    //_tags[ctag].dirty = dirty;
-    _dbi[logicalRow].dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;
-    //if(_dbi.testIfPresent(ctag))	cout << "This is a dbi hit for block " << ctag << endl;
-    	
     _tags[ctag].appID = request -> cpuID;
+    _dbi[logicalRow].dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;
 
-    // if the evicted tag entry is valid
     if (tagentry.valid) {
+
+    // this will let in entries that were evicted or already present
+
       INCREMENT(evictions);
 
-      if (_dbi[logicalRow].dirtyBits[ctag % BLOCKS_PER_ROW]) { 
+      if (dbientry.value.dirtyBits[ctag % BLOCKS_PER_ROW]) { 
+    // this will let in entries that were dirty 
+  
         INCREMENT(dirty_evictions);
 
 
@@ -365,12 +416,15 @@ protected:
                             MemoryRequest::WRITEBACK, request -> cmpID, 
                             tagentry.value.vcla, tagentry.value.pcla, _blockSize,
                             request -> currentCycle);
-
+        // Generating writebacks when entry was already present and dirty, is it necessary (for memory consistency perhaps?)
+	cout << "writeback generated due to tagstore eviction\n";
 
         writeback -> icount = request -> icount;
         writeback -> ip = request -> ip;
         SendToNextComponent(writeback);
-      }
+      } 
+
+
     }
   }
 
