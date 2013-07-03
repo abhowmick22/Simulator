@@ -33,6 +33,9 @@
 #include "CmpFDPAP.h"
 #include "CmpFDP.h"
 
+// DBI
+#include "CmpLLCDBI.h"
+
 // -----------------------------------------------------------------------------
 // Function to create a new component
 // -----------------------------------------------------------------------------
@@ -74,7 +77,9 @@ MemoryComponent *CreateComponent(string type) {
     COMPONENT("pacman", CmpPACMan)
     COMPONENT("fdp-ap", CmpFDPAP)
     COMPONENT("fdp", CmpFDP)
+
+    // DBI
+    COMPONENT("llc-dbi", CmpLLCDBI)
     
   COMPONENT_LIST_END
-
 }
