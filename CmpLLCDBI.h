@@ -31,6 +31,8 @@ behaviour of memory controller
 
 #include <iostream>
 #include <bitset>
+#include <fstream>
+#include <string>
 
 // -----------------------------------------------------------------------------
 // Few defines
@@ -81,9 +83,10 @@ protected:
   };
 
   struct DBIEntry {
-    bitset <NUMBER_OF_ROWS> dirtyBits;
-    // pointer to a clean request for this current row ?
-    DBIEntry() { dirtyBits.reset(); 
+    bitset <BLOCKS_PER_ROW> dirtyBits;
+    // pointer to a clean request for this current row ?   
+    DBIEntry() { 
+    dirtyBits.reset(); 
     }
   };
 
@@ -103,6 +106,11 @@ protected:
   vector <uint32> _misses;
 
   // -------------------------------------------------------------------------
+  // Output file
+  // -------------------------------------------------------------------------
+
+
+  // -------------------------------------------------------------------------
   // Declare Counters
   // -------------------------------------------------------------------------
 
@@ -112,6 +120,7 @@ protected:
   NEW_COUNTER(misses);
   NEW_COUNTER(evictions);
   NEW_COUNTER(dirty_evictions);
+  NEW_COUNTER(dbievictions);
 
 
 public:
@@ -175,6 +184,7 @@ public:
     INITIALIZE_COUNTER(misses, "Total Misses");
     INITIALIZE_COUNTER(evictions, "Evictions");
     INITIALIZE_COUNTER(dirty_evictions, "Dirty Evictions");
+    INITIALIZE_COUNTER(dbievictions, "DBI Evictions");
   }
 
 
@@ -189,9 +199,10 @@ public:
 
     // number of dbi entries
     // the default dbi storage size is the nbr of bits for dirty info in a normal cache
-    // _numdbiEntries = (_size * 1024) / (_blockSize * BLOCKS_PER_ROW);
+    // _numdbiEntries = (_size * 1024) / (_blockSize * BLOCKS_PER_ROW);	// same storage space as occupied by dirty bits in a conventional tagstore
+     _numdbiEntries = _dbiSize;
 
-    _numdbiEntries = 1000000;			// enough space for all rows in a 8 GB memory
+    //_numdbiEntries = 1000000;			// enough space for all rows in a 8 GB memory
 
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
     _dbi.SetTagStoreParameters(1, _numdbiEntries, _dbipolicy);
@@ -292,8 +303,21 @@ protected:
 
       if (_tags.lookup(ctag))
         //_tags[ctag].dirty = true;
-	//_dbi.setDirty(ctag);
-        _dbi[logicalRow].dirtyBits.set(ctag % BLOCKS_PER_ROW);			// set corr bit in appr entry
+        {
+         
+         // this index is different from the offending index
+        //_dbi[logicalRow].dirtyBits.set(ctag % BLOCKS_PER_ROW);  
+        
+/*
+Difference between [] operator and read(key_t) is that the latter updates with the replacement policy whereas the former is just 
+a simple way to access the entry
+*/
+
+	// this one sets the dirty bit alongwith doing the replacement policy
+        _dbi.read(logicalRow).value.dirtyBits.set(ctag % BLOCKS_PER_ROW);	
+    
+        }
+
       else
         INSERT_BLOCK(ctag, true, request);	
 
@@ -340,19 +364,20 @@ protected:
     table_t <addr_t, TagEntry>::entry tagentry;
     table_t <addr_t, DBIEntry>::entry dbientry;
     
-    bool evictedEntry;					// indicates if dbientry is evicted, true if evicted
+    bool evictedEntry;				// indicates if dbientry is evicted or was already present, true if evicted
 
     addr_t logicalRow = ctag / BLOCKS_PER_ROW;	
 
-    evictedEntry = !(_dbi.lookup(logicalRow));
+    evictedEntry = !(_dbi.lookup(logicalRow));	// should be something that doesn't affect DBI, ie no replacement policy update
 
 /*
 The following FSM has been implemented :
 1. First insert into _dbi.
 2. If returned dbientry was valid and evicted, generate writebacks for all the entries corresponding to dirty bits in the 
-   evicted dbientry. (nothing to be done when dbientry is valid and already present)
-3. Now insert into _tags. 
-4. If returned tagentry is valid and dirty (evicted or already present), then generate writebacks. 
+   evicted dbientry. (nothing to be done when dbientry is valid and already present) Also, delete the tagstore entries 
+   corresponding to these dirty bits. 
+3. Now insert into _tags.
+4. If returned tagentry is valid and dirty (evicted or already present), then generate writeback. 
 */
 
 // if returned entry is due to free list in table, then bool valid will be false
@@ -365,52 +390,69 @@ The following FSM has been implemented :
     
 // 2. 
     if(evictedEntry && dbientry.valid){
+    INCREMENT(dbievictions);
     
     // generate writebacks for all dirty blocks in the row
-      for(int i=0;i<BLOCKS_PER_ROW;i++){
+      for(uint64 i=0;i<BLOCKS_PER_ROW;i++){
            
-          if(dbientry.value.dirtyBits[i]){     
-          ctag = (logicalRow * BLOCKS_PER_ROW) + i;
-
+          if(dbientry.value.dirtyBits[i]){ 
+          addr_t discardtag = (logicalRow * BLOCKS_PER_ROW) + i;	
+          
+	  // now check if the corresponding block is present in the tagstore
+	  // if not, no need to generate writebacks
+	  if(_tags.lookup(discardtag)){
+          
+	  // we have to generate writebacks and remove tagstore entries too
+	  // if we do not remove the tagstore entries, we may have cases where tagentry is there but dbientry is not
+          
+	  table_t <addr_t, TagEntry>::entry discardentry;
+	  discardentry = _tags.invalidate(discardtag);
+          
           MemoryRequest *writeback =
           new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
                             MemoryRequest::WRITEBACK, request -> cmpID, 
-                            _tags[ctag].vcla, _tags[ctag].pcla, _blockSize,
-                            request -> currentCycle);  
-
-	 cout << "writeback generated due to DBI eviction\n";
+                            discardentry.value.vcla, discardentry.value.pcla, _blockSize,
+                            request -> currentCycle);
+          
+	  cout << "writeback generated due to DBI eviction\n";
 
           writeback -> icount = request -> icount;
           writeback -> ip = request -> ip;
           SendToNextComponent(writeback);
           }
+        }
       }
     }
      
-  
-
 // 3. and 4.
 
 tagentry = _tags.insert(ctag, TagEntry(), _pval);
+
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
     _tags[ctag].appID = request -> cpuID;
-    _dbi[logicalRow].dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;
+    _dbi[logicalRow].dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;		
+    //_dbi.read(logicalRow).value.dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;
+    // no need for using replacement policy here, as the new dbientry has already been inserted with update policy    
 
     if (tagentry.valid) {
 
     // this will let in entries that were evicted or already present
 
-      INCREMENT(evictions);
+      INCREMENT(evictions);		// Won't this also count tagentries that were already present ? But once tagstore is 
+                                        // full, we are bound to have evictions i guess 
 
       if (dbientry.value.dirtyBits[ctag % BLOCKS_PER_ROW]) { 
     // this will let in entries that were dirty 
   
         INCREMENT(dirty_evictions);
 
+        // We should check if the dbientry is still present in the DBI, only then clean the corresponding bit
+	if(!evictedEntry)	
+        //_dbi.read(logicalRow).value.dirtyBits.reset(ctag % BLOCKS_PER_ROW);	// no need for replacement policy here also
+	_dbi[logicalRow].dirtyBits.reset(ctag % BLOCKS_PER_ROW);
+        // This is a cleaning operation, clean entry in DBI
 
-        _dbi[logicalRow].dirtyBits.reset(ctag % BLOCKS_PER_ROW);	
-        // This is a cleaning operation, clean entry in DBI, this should be there (gives correct results)
         MemoryRequest *writeback =
           new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
                             MemoryRequest::WRITEBACK, request -> cmpID, 
@@ -423,7 +465,6 @@ tagentry = _tags.insert(ctag, TagEntry(), _pval);
         writeback -> ip = request -> ip;
         SendToNextComponent(writeback);
       } 
-
 
     }
   }

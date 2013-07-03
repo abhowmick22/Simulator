@@ -21,6 +21,12 @@ To try out first experiment,
 1. Changed llc-pref to llc-dbi in Definitions/1-core/baseline
 2. No change in configs
 3. Added a file llc-dbi/lru/1m in Components folder
+4. Added line : dbi-size 128 in Components/llc-dbi/lru
+
+
+gdb --args /home/abhishek/Cache-sim/Simulator/bin/Debug.OoOTraceSimulator --definition /home/abhishek/Cache-sim/Simulator/Definitions/1-core/baseline --configuration /home/abhishek/Cache-sim/Simulator/Configs/1-core/baseline/lru/1m --folder /home/abhishek/Cache-sim/Simulator/results/llc-dbi-new-limitedsize-run1/1-core/baseline/lru/1m/astar --num-cpus 1 --warm-up 500000000 --run-time 500000000 --heart-beat 0 --ooo-window 1 --trace-files /home/abhishek/Cache-sim/Simulator/traces/astar.gz
+
+
 
 
 
