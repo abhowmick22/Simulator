@@ -13,8 +13,46 @@ then the sim ipc and simlog are same with and without dbi
 
 
 
-
-
-
 We should compare against baseline LLC, that is, use a definition file which has component baseline-llc and not llc-pref
 llc-pref is the same, just has prefetch mons
+
+
+
+When using the latest DBI with handler for DBI eviction, following tests work fine:
+1. The statistic 'writebacks due to dbi evictions' ... as the number of dbi entries increases. 
+2. _dbiSize = 1m, writebacks due to dbi evictions =  0 ;
+   _dbiSize = 128, writebacks due to dbi evictions = 12 ;  
+   _dbiSize = 32, writebacks due to dbi evictions =  19 
+
+
+When using LLC with latest DBI and AWB, foll results :
+DBI size : 128   AWBs generated : 0
+DBI size : 512   AWBs generated : 6
+DBI size : 1024   AWBs generated : 6
+DBI size : 1m   AWBs generated : 0
+
+Above experiments need to be redone with corrections to LLCDBI and LLCwAWB(corrections done)
+
+
+
+With corrections to DBI, and unlimited dbi size, the stats with and without dbi are same
+
+
+By changing the insertion policy into dbi (write only when block insertion is dirty), 
+we see that the writebacks due to dbi eviction vanish at 128, 512 and so on
+When dbi size is 2, we would expect WBs due to dbi eviction because of the small number of dbi entries. 
+With such a small DBI Size, significant DBI evictions do occur, but they become small in number further into the simulation. This 
+suggests that the app behaves such that most of the mem accesses reside very close to each other in main memory. 
+
+
+
+
+
+
+
+
+
+Write intensive benchmarks are :
+lbm, hmmer, mcf (read intensive, dunno abt write)
+However, these are all speccpu2000 & 2006 benchmarks, which should be fine for now. For studying parallel machines, parsec is 
+needed. 

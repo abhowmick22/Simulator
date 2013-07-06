@@ -43,7 +43,8 @@ struct MemoryRequest {
     WRITEBACK,
     READ_FOR_WRITE,
     FAKE_READ,
-    PREFETCH
+    PREFETCH,
+    CLEAN							// New CLEAN request type for aggressive writebacks
   } type;
   // instruction pointer
   addr_t ip;

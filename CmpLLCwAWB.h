@@ -1,9 +1,10 @@
 // -----------------------------------------------------------------------------
-// File: CmpLLCDBI.h
+// File: CmpLLCwAWB.h
 // Description:
 //    Implements a last-level cache
 // This cache stores the dirty bit information in a separate DBI
 // The DBI is derived from the GenericTagStore
+// It also implements aggresive writeback policy
 // -----------------------------------------------------------------------------
 
 /*
@@ -14,8 +15,8 @@ Right now, we assume that  the memory controller does this correctly, if it does
 behaviour of memory controller
 */
 
-#ifndef __CMP_LLC_DBI_H__
-#define __CMP_LLC_DBI_H__
+#ifndef __CMP_LLC_AWB_H__
+#define __CMP_LLC_AWB_H__
 
 // -----------------------------------------------------------------------------
 // Module includes
@@ -43,12 +44,12 @@ behaviour of memory controller
 #define NUMBER_OF_BANKS 8
 
 // -----------------------------------------------------------------------------
-// Class: CmpLLCDBI
+// Class: CmpLLCwAWB
 // Description:
-//    Baseline lastlevel cache with DBI.
+//    Baseline lastlevel cache with DBI and implementing aggressive writeback.
 // -----------------------------------------------------------------------------
 
-class CmpLLCDBI : public MemoryComponent {
+class CmpLLCwAWB : public MemoryComponent {
 
 protected:
 
@@ -106,9 +107,11 @@ protected:
   vector <uint32> _misses;
 
   // -------------------------------------------------------------------------
-  // Output file
+  // Structures for cleaning row (aggressive writeback operations)
   // -------------------------------------------------------------------------
 
+  addr_t cleanRow;			// this stores which row is currently being cleaned, should store a physical row
+  bool cleanFlag;			// true indicates that the row is clean
 
   // -------------------------------------------------------------------------
   // Declare Counters
@@ -127,10 +130,9 @@ public:
 
   // -------------------------------------------------------------------------
   // Constructor. It cannot take any arguments
-  // By default, dbi size is equal to the cache size
   // -------------------------------------------------------------------------
 
-  CmpLLCDBI() {
+  CmpLLCwAWB() {
     _size = 1024;
     _blockSize = 64;
     _associativity = 16;
@@ -140,7 +142,8 @@ public:
     _dbipolicy = "lru";
     _policyVal = 0;
     _dbiPolicyVal = 0;
-    _dbiSize = 0;			// to be used later for size
+    _dbiSize = 0;
+    cleanFlag = true;
   }
 
 
@@ -194,21 +197,15 @@ public:
 
   void StartSimulation() {
 
-    // compute number of sets
     _numSets = (_size * 1024) / (_blockSize * _associativity);
-
-    // number of dbi entries
-    // the default dbi storage size is the nbr of bits for dirty info in a normal cache
+   
     // _numdbiEntries = (_size * 1024) / (_blockSize * BLOCKS_PER_ROW);	// same storage space as occupied by dirty bits in a conventional tagstore
-     _numdbiEntries = _dbiSize;
+     _numdbiEntries = _dbiSize;			// this is a parameter
 
     //_numdbiEntries = 1000000;			// enough space for all rows in a 8 GB memory
 
     _tags.SetTagStoreParameters(_numSets, _associativity, _policy);
-    _dbi.SetTagStoreParameters(1, _numdbiEntries, _dbipolicy);
-
-    // check if table parameters are initialized
-  
+    _dbi.SetTagStoreParameters(1, _numdbiEntries, _dbipolicy);  
 
     switch (_policyVal) {
     case 0: _pval = POLICY_HIGH; break;
@@ -304,12 +301,9 @@ protected:
       if (_tags.lookup(ctag))
         //_tags[ctag].dirty = true;
         {
-         
-         // this index is different from the offending index
-        //_dbi[logicalRow].dirtyBits.set(ctag % BLOCKS_PER_ROW);  
 
-	// this one sets the dirty bit alongwith doing the replacement policy
-        if(_dbi.lookup(logicalRow)){	_dbi[logicalRow].dirtyBits.set(ctag % BLOCKS_PER_ROW);	
+        if(_dbi.lookup(logicalRow)){	
+	_dbi[logicalRow].dirtyBits.set(ctag % BLOCKS_PER_ROW);	
 	// Not all clean blocks are guaranteed to have their dirty bit info in the DBI
 
 	// dummy read to update with replacement policy
@@ -317,21 +311,63 @@ protected:
         }
 
 	else{
-        table_t <addr_t, DBIEntry>::entry dbientry;    
+	table_t <addr_t, DBIEntry>::entry dbientry;    
 	bool DBIevictedEntry;
 	DBIevictedEntry = !(_dbi.lookup(logicalRow));
 
 	HANDLE_DBI_INSERTION(ctag, request, dbientry, DBIevictedEntry);
-// this will handle dbi insertion when tagstore entry is not present
+// this will handle dbi insertion when tagstore entry is not present  
+	 }   
         }
-	        
-      }
 
       else
-        INSERT_BLOCK(ctag, true, request);	
+        INSERT_BLOCK(ctag, true, request);
 
-      request -> serviced = true;
-      return _tagStoreLatency;
+      request -> serviced = true; 
+      return _tagStoreLatency;	
+
+     case MemoryRequest::CLEAN:
+
+
+        cout << "clean memory request received with cleanrow " << cleanRow << endl;
+     // check if the row hasn't been cleaned yet and the that the corresponding dbientry still exists
+        if((!cleanFlag)&&_dbi.lookup(cleanRow)){
+           
+           if(!_dbi[cleanRow].dirtyBits.any()){		// row has been cleaned, no cleaning operation left
+             cleanFlag = true;
+             cout << "clean memory request for cleanrow " << cleanRow << " finished\n";
+             request -> serviced = true;
+             }
+
+           else{
+           int i=0;
+           while(!_dbi[cleanRow].dirtyBits[i])	i++;
+           
+           addr_t wbtag = (cleanRow * BLOCKS_PER_ROW) + i;
+           TagEntry wbentry = _tags[wbtag];
+
+           MemoryRequest *writeback =
+           new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                            MemoryRequest::WRITEBACK, request -> cmpID, 
+                            wbentry.vcla, wbentry.pcla, _blockSize,
+                            request -> currentCycle);
+           cout << "Aggressive writeback generated " << endl;
+           writeback -> icount = request -> icount;
+           writeback -> ip = request -> ip;
+           SendToNextComponent(writeback);
+           _dbi[cleanRow].dirtyBits.reset(i);
+           }
+
+        }
+
+     //  if row is not clean and its dbientry doesn't exist, it means that row has been evicted and its dirty blocks cleaned
+        else if((!cleanFlag)&&(!_dbi.lookup(cleanRow))){
+          cleanFlag = true;
+          request -> serviced = true;
+        }
+      
+       return _tagStoreLatency;			// Don't know what latency to return
+      
     }
   }
 
@@ -343,7 +379,7 @@ protected:
     
   cycles_t ProcessReturn(MemoryRequest *request) { 
 
-    // if its a writeback from this component, delete it
+    // if its a writeback or clean from this component, delete it
     if (request -> iniType == MemoryRequest::COMPONENT &&
         request -> iniPtr == this) {
       request -> destroy = true;
@@ -393,38 +429,48 @@ The following FSM has been implemented :
 
 // How to differentiate between evicted and already present, use evictedEntry and lookup
 
-
-
 if(dirty)	HANDLE_DBI_INSERTION(ctag, request, dbientry, DBIevictedEntry);
-     
+    
 // 3. and 4.
 
 tagentry = _tags.insert(ctag, TagEntry(), _pval);
+// this has to be an eviction always
 
     _tags[ctag].vcla = BLOCK_ADDRESS(VADDR(request), _blockSize);
     _tags[ctag].pcla = BLOCK_ADDRESS(PADDR(request), _blockSize);
-    _tags[ctag].appID = request -> cpuID;		
-    //_dbi.read(logicalRow).value.dirtyBits[ctag % BLOCKS_PER_ROW] = dirty; // already done above    
-
+    _tags[ctag].appID = request -> cpuID;
+    //_dbi.read(logicalRow).value.dirtyBits[ctag % BLOCKS_PER_ROW] = dirty;
+       
     if (tagentry.valid) {
-    // this will let in entries that were evicted, tagentry is always evicted
+
+    // this will let in entries that were evicted or already present
 
       INCREMENT(evictions);		
 
-     bool specialCase = false;
+bool specialCase = false;
      if(dirty)	specialCase = (((dbientry.key == (tagentry.key) / BLOCKS_PER_ROW)&&(dbientry.value.dirtyBits[(tagentry.key) % BLOCKS_PER_ROW])))?true:false;
 
 
-      if (((_dbi.lookup((tagentry.key) / BLOCKS_PER_ROW))&&(_dbi[(tagentry.key) / BLOCKS_PER_ROW].dirtyBits[(tagentry.key) % BLOCKS_PER_ROW])) || specialCase) { 
-    // this will let in entries that were dirty, specialCase leads to extrememly rare dirty evictions
+// specialCase is that when the evicted dbientry contains the dirty bit info for the evicted tagstore entry(which happens to be 
+// dirty) as well
+
+    if (((_dbi.lookup((tagentry.key) / BLOCKS_PER_ROW))&&(_dbi[(tagentry.key) / BLOCKS_PER_ROW].dirtyBits[(tagentry.key) % BLOCKS_PER_ROW])) || specialCase){			
+// dbientry is generated only in case of dirty = true 
+// check if evicted tagentry still has its dirty info in dbi OR
+// in the evicted dbientry
+// and then, if corresponding dirty bits are set
+
+     // if (dbientry.value.dirtyBits[ctag % BLOCKS_PER_ROW]) { 
+    // this is an implicit assumption that evicted dbientry has dirty bit info for evicted tagentry
   
         INCREMENT(dirty_evictions);
 
         // We should check if the dbientry is still present in the DBI, only then clean the corresponding bit
 	if(_dbi.lookup((tagentry.key) / BLOCKS_PER_ROW))	
-        //_dbi.read(logicalRow).value.dirtyBits.reset(ctag % BLOCKS_PER_ROW);	// no need for replacement policy here also
+        //_dbi.read(logicalRow).value.dirtyBits.reset(ctag % BLOCKS_PER_ROW);	// no need for replacement policy here also 
 	_dbi[(tagentry.key) / BLOCKS_PER_ROW].dirtyBits.reset((tagentry.key) % BLOCKS_PER_ROW);
-        // This is a cleaning operation, clean entry in DBI
+        // This is a cleaning operation, clean entry in DBI if present
+        // also invalidate row if it was the last set bit
 
         MemoryRequest *writeback =
           new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
@@ -437,7 +483,24 @@ tagentry = _tags.insert(ctag, TagEntry(), _pval);
         writeback -> icount = request -> icount;
         writeback -> ip = request -> ip;
         SendToNextComponent(writeback);
-      } 
+
+        // Generate CLEAN request if no clean requests for previous rows pending
+        if(cleanFlag && (!DBIevictedEntry)){
+        // we would not want to generate clean request when we have inserted new dbientry, as it will be a clean row 
+        MemoryRequest *clean =
+          new MemoryRequest(MemoryRequest::COMPONENT, request -> cpuID, this,
+                            MemoryRequest::CLEAN, request -> cmpID, 
+                            tagentry.value.vcla, tagentry.value.pcla, _blockSize,
+                            request -> currentCycle);
+        clean -> icount = request -> icount;
+        clean -> ip = request -> ip;
+        cleanFlag = false;
+        cleanRow = logicalRow;
+        cout << "new clean request generated for cleanrow " << cleanRow << endl;
+        AddRequest(clean);
+        }
+       
+     }
 
     }
   }
@@ -487,6 +550,7 @@ void HANDLE_DBI_INSERTION(addr_t ctag, MemoryRequest *request, table_t <addr_t, 
       }
     }
   }
+
 
 };
 

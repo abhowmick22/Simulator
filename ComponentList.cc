@@ -35,6 +35,7 @@
 
 // DBI
 #include "CmpLLCDBI.h"
+#include "CmpLLCwAWB.h"
 
 // -----------------------------------------------------------------------------
 // Function to create a new component
@@ -80,6 +81,7 @@ MemoryComponent *CreateComponent(string type) {
 
     // DBI
     COMPONENT("llc-dbi", CmpLLCDBI)
+    COMPONENT("llc-awb", CmpLLCwAWB)
     
   COMPONENT_LIST_END
 }
