@@ -1,4 +1,4 @@
-sudo python run_simulator.py --definition 1-core/baseline --configurations lru/1m --folder /home/abhishek/Cache-sim/Simulator/results --workload-file 1-core/mytest
+python run_simulator.py --definition 1-core/baseline --configurations lru/1m --folder /home/abhishek/Cache-sim/Simulator/results/1-core/astar/llc-awb-128 --workload-file 1-core/mytest --condor --machine ocelot vseshadr cheetah04 cheetah06 cheetah07
 
 
 When I use 1-core/2l/baseline instead of 1-core/baseline, I get errors like component file not found, which is due to type not 
