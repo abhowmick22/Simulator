@@ -1,9 +1,9 @@
 all: bin/OoOTraceSimulator bin/Debug.OoOTraceSimulator bin/Prof.OoOTraceSimulator
 debug: bin/Debug.OoOTraceSimulator
 
-CPPFLAGS = -O3 -lm -DNDEBUG
-DEBUGFLAGS = -lm -g 
-PROFFLAGS = -lm -pg
+CPPFLAGS = -O3 -lm -ldramsim -DNDEBUG -DDRAMSIM -I/home/abhowmic/DRAMSim2/ -L/home/abhowmic/DRAMSim2/ -Wl,-rpath=/home/abhowmic/DRAMSim2/
+DEBUGFLAGS = -lm -g -ldramsim -DDRAMSIM -I/home/abhowmic/DRAMSim2/ -L/home/abhowmic/DRAMSim2/ -Wl,-rpath=/home/abhowmic/DRAMSim2/
+PROFFLAGS = -lm -pg -ldramsim -DDRAMSIM -I/home/abhowmic/DRAMSim2/ -L/home/abhowmic/DRAMSim2/ -Wl,-rpath=/home/abhowmic/DRAMSim2/
 SRCS = ComponentList.cc
 HEADERS = $(wildcard *.h)
 

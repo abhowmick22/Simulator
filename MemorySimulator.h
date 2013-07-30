@@ -25,6 +25,7 @@
 #include <cassert>
 #include <sstream>
 #include <cstring>
+#include <iostream>
 
 using namespace std;
 
@@ -52,7 +53,6 @@ class MemorySimulator {
 
     // current time of the simulator
     cycles_t _currentCycle;
-
 
   public:
 
@@ -114,6 +114,7 @@ class MemorySimulator {
         (*cmp) -> InitializeStatistics();
         (*cmp) -> StartSimulation();
       }
+       
     }
 
 
@@ -123,11 +124,11 @@ class MemorySimulator {
 
     void AdvanceSimulation(cycles_t now) {
       // update current time of the simulator
-      // Who gives this updated time to simulator ? look for this function
+     
 	// This is done by the AutoAdvance function
-      if (now > _currentCycle)
-        _currentCycle = now;
-
+      if (now > _currentCycle)	_currentCycle = now;
+	//cout << "current cycle of memory simulator is " << _currentCycle << endl;
+	
       // Process pending requests of all the components
       list <MemoryComponent *>::iterator cmp;
       for (cmp = _components.begin(); cmp != _components.end(); cmp ++) {
@@ -145,32 +146,61 @@ class MemorySimulator {
       
       // For each component, find the earliest request that can be processed.
       // Take the min of all and advance simulation to that point.
-      
+      //cout << "auto advance start\n";
       cycles_t min;
       bool flag = false;
+      bool update = false;
+      min = _currentCycle;
 
+      MemoryComponent* cmpe;
       MemoryRequest *request;
       list <MemoryComponent *>::iterator cmp;
       for (cmp = _components.begin(); cmp != _components.end(); cmp ++) {
+        //cout << "size of the comp " << (*cmp) -> Name() << "  is " << (*cmp) -> Size() << endl; 
+		
         request = (*cmp) -> EarliestRequest();
+        
 	// EarliestRequest just returns the top of the queue
         if (request != NULL) {
-          if (!flag) {
-            flag = true;
+	
+
+	if(request->s_f_d){
+	//(request -> currentCycle) += 5;
+        //(*cmp) -> UpdateQueue();
+	update = true;
+	}
+
+	  if (!flag) {
+	    //cout << "stuck at point x" << endl;
+            flag = true;	
             min = request -> currentCycle;
+	    
           }
           else {
+            //cout << "stuck at point 3" << endl;
             if (min > request -> currentCycle)
               min = request -> currentCycle;
+	      cmpe = *cmp;
+	//cout << "component stuck is " << cmpe -> Name() << endl;
           }
         }
+      
+	if(update){(*cmp) -> UpdateQueue();update = false;}
       }
 
+	
+	
+
       if (!flag) {
-        fprintf(stderr, "Request is waiting for nothing?\n");
+        fprintf(stderr, "Request is waiting for nothing?\n"); // occurs when all components have empty queues
+	// possibly I am sending all requests to DRAMSim and emptying all my request queues
         exit(0);
       }
 
+	//if(min == _currentCycle){	min ++;cout << "min cycle is " << min << " and current cycle is " << _currentCycle << endl;}
+	//cout << "outside min cycle is " << min << " and current cycle is " << _currentCycle << endl;
+	
+	//cout << "auto advance end with min as " << min << endl << endl;
       AdvanceSimulation(min);
     }
 

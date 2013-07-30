@@ -33,6 +33,7 @@
 #include <bitset>
 #include <queue>
 #include <list>
+#include <iostream>
 
 #define WARM_UP 0
 #define HEART_BEAT 1
@@ -134,6 +135,7 @@ class OoOTraceSimulator {
 
       // until all processors have finished
       while (finished.count() < _numCPUs) {
+	//if((_procs[0].currentIcount) % 1000 == 0)	cout << "Current cycle is " << _procs[0].currentCycle << endl;
 
         if (_queue.empty()) {
           printf("What the hell!");
@@ -157,9 +159,11 @@ class OoOTraceSimulator {
         // advance simulation to request's current cycle
         if (!request -> stalling) {
           _simulator.AdvanceSimulation(request -> currentCycle);
+	//cout << "Advance simulation to " << request -> currentCycle << endl;
         }
         else {
           _simulator.AutoAdvance();
+	//cout << "Autoadvance called " << endl;
         }
 
         // if the request has not completed, push it back to the queue
@@ -390,6 +394,10 @@ class OoOTraceSimulator {
 
           _queue.push(_procs[i].outstanding.back());
           _simulator.ProcessMemoryRequest(_procs[i].outstanding.back());
+
+	// **** Are we completing the simulation here?
+
+
 
           // get the next request 
           if (_synthetic)

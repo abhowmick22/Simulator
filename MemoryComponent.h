@@ -286,6 +286,21 @@ class MemoryComponent {
     }
 
 
+    // return size
+
+    unsigned Size(){
+	return _queue.size();
+   }
+
+    // update with new value of top
+    void UpdateQueue(){
+	MemoryRequest* request = _queue.top();
+	_queue.pop();
+	(request -> currentCycle) += 10;
+	_queue.push(request);
+    }
+
+
     // -------------------------------------------------------------------------
     // Function to return the name of the component
     // -------------------------------------------------------------------------
@@ -339,16 +354,34 @@ class MemoryComponent {
       _queue.push(request);
       if (!_processing)
         ProcessPendingRequests();
+	
     }
 
 
     // -------------------------------------------------------------------------
     // Function to get the head of queue
+    // This function has been modified to return the earliest request that is 
+    // not stalling for DRAMSim
     // -------------------------------------------------------------------------
 
     MemoryRequest * EarliestRequest() {
       if (_queue.empty())
         return NULL;
+
+/*
+      vector <MemoryRequest *> temp;
+      MemoryRequest* request;
+      while(_queue.top()->stalling){	// Return the first non-stalling request
+	temp.push_back(_queue.top());
+	_queue.pop();
+        if (_queue.empty()) break;
+	}
+      request = _queue.top();
+      unsigned sizetemp = temp.size();
+      for(unsigned i=0;i<sizetemp;i++){_queue.push(temp.back());temp.pop_back();}	// rectify the queue
+      return request;
+*/
+
       return _queue.top();
     }
 
@@ -442,6 +475,8 @@ and do this for all the request that are in the queue.
 Access the request according to age. 
 */
       // process till component (or request ??) reaches simulator cycles
+
+	// What if the currentCycle of request is more than _simulatorCycle ?, as is the case when a request is returned by a cb
       while (request -> currentCycle <= (*_simulatorCycle)) {
         
         _queue.pop();
@@ -516,7 +551,12 @@ Access the request according to age.
       if (request -> destroy) {
         delete request;
         return;
-      }        
+      }   
+
+      if(request -> type == MemoryRequest::CLEAN){
+         this -> AddRequest(request);
+         return;
+      }     
 
       // if the request is stalling, set its current cycle to 
       // one past the component's currenct cycle (ensure progress)

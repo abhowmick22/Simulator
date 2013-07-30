@@ -59,6 +59,8 @@ struct MemoryRequest {
   // id of the prefetcher if prefetched
   uint32 prefetcherID;
   
+
+  
   // ---------------------------------------------------------------------------
   // Dynamically determined fields
   // ---------------------------------------------------------------------------
@@ -72,12 +74,16 @@ struct MemoryRequest {
   // stalling. indicates that the request is stalling
   // in the current component
   bool stalling;
+ // to indicate if stalling for dramsim
+  bool s_f_d;
   // set if a component chooses to delete the request
   bool destroy;
   // serviced
   bool serviced;
   // finished
   bool finished;
+  // DRAM issue cycle
+  cycles_t dramIssueCycle;  
 
 
   // ---------------------------------------------------------------------------
@@ -113,6 +119,7 @@ struct MemoryRequest {
     dirtyReply = false;
     d_prefetched = false;
     d_hit = false;
+    s_f_d = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -138,6 +145,7 @@ struct MemoryRequest {
     dirtyReply = false;
     d_prefetched = false;
     d_hit = false;
+    s_f_d = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -152,7 +160,7 @@ struct MemoryRequest {
   // Comparison class for memory request pointers
   // ---------------------------------------------------------------------------
 
-// returns True if the first object is older than second one
+// returns True if the first object is newer than second one
   struct ComparePointers {
     bool operator() (const MemoryRequest *a, const MemoryRequest *b) const {
       return (a -> currentCycle) > (b -> currentCycle);

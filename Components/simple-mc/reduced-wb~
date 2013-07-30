@@ -1,4 +1,4 @@
-num-banks 8
+num-banks 4
 row-size 8192
 row-hit-latency 168
 row-conflict-latency 408

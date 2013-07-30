@@ -1,0 +1,3 @@
+num-banks 8
+row-size 8192
+num-write-buffer-entries 16

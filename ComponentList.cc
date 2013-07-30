@@ -37,6 +37,9 @@
 #include "CmpLLCDBI.h"
 #include "CmpLLCwAWB.h"
 
+// DRAMSim
+#include "CmpDRAMSim.h"
+
 // -----------------------------------------------------------------------------
 // Function to create a new component
 // -----------------------------------------------------------------------------
@@ -82,6 +85,9 @@ MemoryComponent *CreateComponent(string type) {
     // DBI
     COMPONENT("llc-dbi", CmpLLCDBI)
     COMPONENT("llc-awb", CmpLLCwAWB)
+
+    // DRAMSim
+    COMPONENT("dramsim", CmpDRAMSim)
     
   COMPONENT_LIST_END
 }
