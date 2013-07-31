@@ -170,17 +170,6 @@ public:
 
 	void read_complete(unsigned id, uint64_t address, uint64_t clock_cycle)
 	{
-    // printf("[Callback] read complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
-    // callback function will set the corresponding request as serviced, add latency to request's latency, send the 
-    // request to 
-    // its next component, also update the _currentCycle of the simulator
-    // For this request needs to have an id, which will determine which entry to free when callback fires, we use addr and order 
-    // of the _queue vector for this
-
-	//OutFile << endl << "read callback fired for request of addr : " << address << " at DRAM time : " << clock_cycle*_busProcessorRatio << endl;
-	//OutFile << " SIM time : " << *_simulatorCycle << endl;
-	//OutFile << " DRAM time : " << DRAMtime << endl;
-
 
 	vector <MemoryRequest *> temp; 
         MemoryRequest *tempReq;		// All because I can't iterate over a priority_queue
@@ -208,42 +197,24 @@ public:
 
 			tempReq -> serviced = true;
 			tempReq -> s_f_d = false;
-			//OutFile << "the request was sent to dramsim at " << tempReq -> dramIssueCycle << " with an address " << ALIGN_ADDRESS(tempReq -> virtualAddress, TRANS_SIZE) << endl;
-			//OutFile << "The latency of this request is " << (clock_cycle*_busProcessorRatio) - (tempReq -> dramIssueCycle) << endl;
-
-			// this is a placeholder
-			// _currentCycle is not really critical
 		      
 			cycles_t now = max((cycles_t)(clock_cycle*_busProcessorRatio), _currentCycle);
 			_currentCycle = now;
 
 			pendingRequests--;
-			//OutFile << "number of pending requests is " << pendingRequests << endl << endl;
-
+			
 			tempReq -> AddLatency((clock_cycle*_busProcessorRatio) - (tempReq -> currentCycle));
-                        //SendToNextComponent(tempReq);
-			// alternative is, do all the tasks of SendToNextComponent except processpendingrequests in AddRequest
 			tempReq -> cmpID --;
 			((*_hier)[tempReq -> cpuID])[tempReq -> cmpID] -> SimpleAddRequest(tempReq);
 			return;
                 	}
                 }
-		OutFile << "DAFUQ Happened ? read cb\n";
+		fprintf(stderr, "Returned read transaction has no matching request\n");
 
 	}
 
 	void write_complete(unsigned id, uint64_t address, uint64_t clock_cycle)
 	{
-    // printf("[Callback] write complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
-    // callback function will set the corresponding request as serviced, add latency to request's latency, send the 
-    // request to 
-    // its next component, free the entry in pending request list, also update the _currentCycle of the simulator
-    // For this request needs to have an id, which will determine which entry to free when callback fires, we use addr and order 
-    // of the pendingRequests list for this
-	//OutFile << endl << "write callback fired for request of addr : " << address << " at DRAM time : " << clock_cycle*_busProcessorRatio << endl;
-	//OutFile << " SIM time : " << *_simulatorCycle << endl;
-	//OutFile << " DRAM time : " << DRAMtime << endl << endl;
-
 
 	vector <MemoryRequest *> temp; 
         MemoryRequest *tempReq;		// All because I can't iterate over a priority_queue
@@ -271,26 +242,19 @@ public:
 
 			tempReq -> serviced = true;
 			tempReq -> s_f_d = false;
-			//OutFile << "the request was sent to dramsim at " << tempReq -> dramIssueCycle << " with an address " << ALIGN_ADDRESS(tempReq -> virtualAddress, TRANS_SIZE) << endl;
-			//OutFile << "The latency of this request is " << (clock_cycle*_busProcessorRatio) - (tempReq -> dramIssueCycle) << endl;
-
-			// this is a placeholder
-			// _currentCycle is not really critical
-		      
+			
 			cycles_t now = max((cycles_t)(clock_cycle*_busProcessorRatio), _currentCycle);
 			_currentCycle = now;
 
 			pendingRequests--;
-			//OutFile << "number of pending requests is " << pendingRequests << endl << endl;
-
+			
 			tempReq -> AddLatency((clock_cycle*_busProcessorRatio) - (tempReq -> currentCycle));
-                        //SendToNextComponent(tempReq);
-			tempReq -> cmpID --;
+                       	tempReq -> cmpID --;
 			((*_hier)[tempReq -> cpuID])[tempReq -> cmpID] -> SimpleAddRequest(tempReq);
 			return;
                 	}
                 }
-		//OutFile << "DAFUQ Happened ? read cb\n";
+		fprintf(stderr, "Returnede write transaction does not have matching request\n");
 
 
 	}
@@ -379,7 +343,7 @@ public:
 */
 	mem = getMemorySystemInstance("ini/DDR2_micron_16M_8b_x8_sg3E.ini", "system.ini", "/home/abhishek/DRAMSim2", "MyResults", 1024);
 	uint64_t procSpeed = 2666666667;
-	//8 * 1000000000 / tCK;	// Here 8 is the busprocessorratio
+	// Here 8 is the busprocessorratio
         mem->setCPUClockSpeed(procSpeed);
 	DRAMtime = *_simulatorCycle;
 
@@ -467,101 +431,19 @@ protected:
       INCREMENT(rowconflicts);
       _openRow[bankIndex] = rowID;
     }
-
-
-    // Can't really measure the turnarounds   
+ 
 
     bool accepted = mem->addTransaction(isWrite, addr);
-    // request -> currentCycle is already set to _currentCycle of component
-    if(accepted){request -> s_f_d = true;
+    if(accepted){
+    request -> s_f_d = true;
     if(addr == 139779289939584) cout << "sent this at cycle " << *_simulatorCycle<<endl;
     pendingRequests++;
     request -> dramIssueCycle = request -> currentCycle;
-    //OutFile << "number of pending requests is " << pendingRequests << endl;
-    //OutFile << "Transaction with addr : " << addr << " and type " << request->type << " added to dramsim at sim time : " << *_simulatorCycle << " and dram time : " << DRAMtime << endl;
-    //OutFile << " The currentCycle of the transaction added is " << request -> dramIssueCycle << endl;
-    //OutFile << "The icount of the transaction added is " << request -> icount << " and its issue cycle is "<< request -> issueCycle << endl << endl;
-	}
+    }
     else OutFile << "DRAMSim rejection occured " << endl;
+
     this -> AddRequest(request);		// add accepted or non-accepted request to queue of Memory Controller
-
-    	// Do we really need this ?
-    /*
-    cycles_t prevDRAMtime = DRAMtime;
-    for(cycles_t i=0;i<((*_simulatorCycle)-prevDRAMtime);i++){
-    mem->update();						// update the DRAM time
-    DRAMtime++;
-    }
-    */
-
     return 0;
-      
-    
-    
-
-/*
-    cycles_t latency = 0;
-    cycles_t turnAround = 0;
-
-    // determine if there is a switch penalty
-    switch (request -> type) {
-
-    case MemoryRequest::READ: case MemoryRequest::READ_FOR_WRITE: case MemoryRequest::PREFETCH:
-      INCREMENT(reads);
-      if (_lastOp == MemoryRequest::WRITEBACK) {
-        INCREMENT(writetoreads);
-        latency += _writeToReadLatency;
-        turnAround = _writeToReadLatency;
-      }
-      break;
-
-    case MemoryRequest::WRITEBACK:
-      INCREMENT(writes);
-      if ((_lastOp == MemoryRequest::READ) || (_lastOp == MemoryRequest::READ_FOR_WRITE) || (_lastOp == MemoryRequest::PREFETCH)) {
-        INCREMENT(readtowrites);
-        latency += _readToWriteLatency;
-        turnAround = _readToWriteLatency;
-      }
-      break;
-
-    case MemoryRequest::WRITE:
-    case MemoryRequest::PARTIALWRITE:
-      fprintf(stderr, "Memory controller cannot get a write\n");
-      exit(0);          
-    }
-
-    _lastOp = request -> type;
-
-      
-    // Get the row address of the request
-    addr_t logicalRow = (request -> virtualAddress) / _rowSize;
-    uint32 bankIndex = logicalRow % _numBanks;
-    uint32 rowID = logicalRow / _numBanks;
-
-    // check if the access is a row hit or conflict
-    if (_openRow[bankIndex] == rowID) {
-      if((request -> type == MemoryRequest::READ)||(request -> type == MemoryRequest::READ_FOR_WRITE)||(request -> type == MemoryRequest::PREFETCH)){ 
-        INCREMENT(Readrowhits);
-      }
-      else 
-        INCREMENT(Writerowhits);
-      latency += _rowHitLatency;
-    }
-
-    else {
-      INCREMENT(rowconflicts);
-      latency += _rowConflictLatency;
-	// this line is for removing write row conflict penalty
-	//if(request -> type == MemoryRequest::WRITEBACK)	latency = latency - _rowConflictLatency + _rowHitLatency;
-      _openRow[bankIndex] = rowID;
-    }
-
-    request -> AddLatency(latency);
-    request -> serviced = true;
-    if((request -> type == MemoryRequest::READ)||(request -> type == MemoryRequest::READ_FOR_WRITE)||(request -> type == MemoryRequest::PREFETCH))	readandprefetch_cycles += (_channelDelay + turnAround);
-    else writeback_cycles += (_channelDelay + turnAround);
-    return _channelDelay + turnAround;
-*/
 
   }
 
@@ -586,16 +468,8 @@ protected:
     
     while(DRAMtime < *_simulatorCycle){
     DRAMtime++;						// update the DRAM time
-	mem->update();						
-    /*
-    if(DRAMtime == 2608205){
-     cout << "Break here \n";
-     }
-    */
+    mem->update();						
     }
-
-	//OutFile << " SIM time : " << *_simulatorCycle << endl;
-	//OutFile << " DRAM time : " << DRAMtime << endl << endl;
 
     // if processing return
     if (_processing)	return;
@@ -612,9 +486,8 @@ protected:
 
     // take all the requests in the queue till the simulator cycle and add
     // them to the read or write queue.
-    if (!CheckifEmpty(_queue)) {		// this checks if there are non-s_f_d requests in the queue
+    if (!CheckifEmpty(_queue)) {		// this checks if there are non-stalling for DRAM requests in the queue
 
-      //cout << "Before processing : " << _queue.size() << endl;
       vector <MemoryRequest *> temp;
 
       while(_queue.top()->s_f_d){	// Coz I don't want to pull out s_f_d requests from the queue
@@ -682,13 +555,6 @@ protected:
     // exceeds simulator time
     while (_currentCycle <= (*_simulatorCycle)) {
 
-	// after some point, _currentCycle exceeds *_simulatorCycle, then we can no longer issue requests
-
-	// I am altering behaviour now, after every ProcessRequest, _currentCycle does not increase, and doesn't become equal to 
-        // *_simulatorCycle, _currentCycle can increase through the callback
-
-    // Why do we this condition here ? 
-
       // get the next request to schedule
       // TODO: request = (*this.*NextRequest)();
       request = FRFCFSDrainWhenFull();
@@ -703,18 +569,6 @@ protected:
       
       request -> currentCycle = now;
       ProcessRequest(request);
-      //cycles_t busyCycles = ProcessRequest(request);
-
-
-	// I will not get back busyCycles immediately, it has gone to a transaction queue
-      /*
-      for(int i=0;i<busyCycles;i++){
-	_currentCycle++;
-	//mem->update();
-	}
-      */
-
-      //SendToNextComponent(request);
     }
 
     _processing = false;
