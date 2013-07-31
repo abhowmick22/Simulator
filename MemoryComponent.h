@@ -296,7 +296,7 @@ class MemoryComponent {
     void UpdateQueue(){
 	MemoryRequest* request = _queue.top();
 	_queue.pop();
-	(request -> currentCycle) += 10;
+	(request -> currentCycle) += 15;
 	_queue.push(request);
     }
 
@@ -355,6 +355,15 @@ class MemoryComponent {
       if (!_processing)
         ProcessPendingRequests();
 	
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Function to add request without doing progress
+    // ------------------------------------------------------------------------
+    void SimpleAddRequest(MemoryRequest *request) {
+      _queue.push(request);
+      	
     }
 
 

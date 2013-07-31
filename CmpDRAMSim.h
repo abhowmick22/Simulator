@@ -221,7 +221,10 @@ public:
 			//OutFile << "number of pending requests is " << pendingRequests << endl << endl;
 
 			tempReq -> AddLatency((clock_cycle*_busProcessorRatio) - (tempReq -> currentCycle));
-                        SendToNextComponent(tempReq);
+                        //SendToNextComponent(tempReq);
+			// alternative is, do all the tasks of SendToNextComponent except processpendingrequests in AddRequest
+			tempReq -> cmpID --;
+			((*_hier)[tempReq -> cpuID])[tempReq -> cmpID] -> SimpleAddRequest(tempReq);
 			return;
                 	}
                 }
@@ -281,7 +284,9 @@ public:
 			//OutFile << "number of pending requests is " << pendingRequests << endl << endl;
 
 			tempReq -> AddLatency((clock_cycle*_busProcessorRatio) - (tempReq -> currentCycle));
-                        SendToNextComponent(tempReq);
+                        //SendToNextComponent(tempReq);
+			tempReq -> cmpID --;
+			((*_hier)[tempReq -> cpuID])[tempReq -> cmpID] -> SimpleAddRequest(tempReq);
 			return;
                 	}
                 }
@@ -469,6 +474,7 @@ protected:
     bool accepted = mem->addTransaction(isWrite, addr);
     // request -> currentCycle is already set to _currentCycle of component
     if(accepted){request -> s_f_d = true;
+    if(addr == 139779289939584) cout << "sent this at cycle " << *_simulatorCycle<<endl;
     pendingRequests++;
     request -> dramIssueCycle = request -> currentCycle;
     //OutFile << "number of pending requests is " << pendingRequests << endl;
