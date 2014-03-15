@@ -1,1 +1,1 @@
-This is a simulator developed by Vivek Seshadri. It has a trace-driven input interface. The trace files are not included in the project repository. Some additional features are being developed by Abhishek Bhowmick. 
+This is a cache + memory system simulator with a trace-driven input interface. The trace files are not included in the project repository. 
